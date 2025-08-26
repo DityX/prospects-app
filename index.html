@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Prospects à proximité – MVP</title>
+  <style>
+    :root { --bg:#0f1115; --card:#171923; --muted:#9aa3b2; --txt:#e5e7eb; --accent:#4f46e5; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--txt); }
+    header { padding: 16px 20px; border-bottom: 1px solid #232633; position: sticky; top:0; background: var(--bg); z-index: 10; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .row { display: grid; gap: 12px; grid-template-columns: repeat(12, 1fr); }
+    .card { background: var(--card); border:1px solid #232633; border-radius: 16px; padding:16px; }
+    .btn { display:inline-flex; align-items:center; gap:8px; border:1px solid #2b2f3d; background:#1b1f2d; color:var(--txt); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600; }
+    .btn:hover { border-color:#3a4052; }
+    .btn.primary { background: var(--accent); border-color: transparent; }
+    .btn.ghost { background: transparent; }
+    .chip { padding:8px 10px; border-radius:999px; border:1px solid #2b2f3d; cursor:pointer; user-select:none; }
+    .chip.on { background: #232742; border-color:#3e4480; }
+    input, select, textarea { width:100%; background:#0f1322; color:var(--txt); border:1px solid #2b2f3d; border-radius:12px; padding:10px 12px; }
+    label { font-size: 12px; color: var(--muted); display:block; margin-bottom:6px; }
+    .list { display:grid; gap:12px; }
+    .poi { background:#0f1322; border:1px solid #24293a; border-radius:14px; padding:12px; display:flex; gap:12px; align-items:center; }
+    .badge { font-size: 12px; color:#cbd5e1; background:#1f2438; padding:4px 8px; border-radius: 999px; border:1px solid #2e3654; }
+    .muted { color: var(--muted); }
+    .split { display:flex; gap:12px; }
+    .split > * { flex:1; }
+    .right { text-align:right; }
+    .small { font-size:12px; }
+    a { color:#93c5fd; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .grid-3 { display:grid; grid-template-columns: repeat(3,1fr); gap:12px; }
+    @media (max-width: 900px){ .row { grid-template-columns: 1fr; } .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+    /* PWA helpers */
+    meta[name="theme-color"] { content: #0f1115; }
+  </style>
+
+  <!-- PWA meta -->
+  <meta name="theme-color" content="#0f1115"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Prospects CEDEO"/>
+
+  <script>
+  // --- Minimal one-file PWA: creates manifest + service worker at runtime
+  (function(){
+    function createIcon(size, emoji){
+      const c=document.createElement('canvas'); c.width=c.height=size;
+      const g=c.getContext('2d');
+      g.fillStyle='#0f1115'; g.fillRect(0,0,size,size);
+      g.fillStyle='#4f46e5'; g.fillRect(size*0.08,size*0.08,size*0.84,size*0.84);
+      g.fillStyle='#e5e7eb'; g.font=`${Math.floor(size*0.5)}px system-ui,Segoe UI,Roboto`;//
+      g.textAlign='center'; g.textBaseline='middle'; g.fillText(emoji||'📍', size/2, size/2+size*0.06);
+      return c.toDataURL('image/png');
+    }
+
+    const manifest = {
+      name: 'Prospects à proximité – CEDEO',
+      short_name: 'Prospects',
+      description: 'Localiser des artisans et générer un message de prospection',
+      start_url: './',
+      scope: './',
+      display: 'standalone',
+      background_color: '#0f1115',
+      theme_color: '#0f1115',
+      icons: [
+        { src: createIcon(192,'📍'), sizes: '192x192', type: 'image/png', purpose:'any maskable' },
+        { src: createIcon(512,'📍'), sizes: '512x512', type: 'image/png', purpose:'any maskable' }
+      ]
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
+    const manifestURL = URL.createObjectURL(manifestBlob);
+    const link = document.createElement('link'); link.rel='manifest'; link.href=manifestURL; document.head.appendChild(link);
+
+    // Service worker (cache-only shell)
+    const swCode = `
+      const CACHE = 'prospects-mvp-v1';
+      self.addEventListener('install', e=>{
+        e.waitUntil(caches.open(CACHE).then(c=>c.addAll([self.location.pathname])));
+        self.skipWaiting();
+      });
+      self.addEventListener('activate', e=>{
+        e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+        self.clients.claim();
+      });
+      self.addEventListener('fetch', e=>{
+        const req = e.request;
+        // Network-first for API (Overpass), cache-first otherwise
+        if(req.url.includes('overpass-api')){
+          e.respondWith(fetch(req).catch(()=>caches.match(req)));
+        } else {
+          e.respondWith(caches.match(req).then(r=> r || fetch(req).then(resp=>{
+            const clone = resp.clone();
+            caches.open(CACHE).then(c=>c.put(req, clone));
+            return resp;
+          }).catch(()=>caches.match(self.location.pathname))));
+        }
+      });
+    `;
+    const swURL = URL.createObjectURL(new Blob([swCode], {type:'text/javascript'}));
+    if('serviceWorker' in navigator){ navigator.serviceWorker.register(swURL, { scope: './' }).catch(console.error); }
+
+    // Install prompt handling
+    let deferredPrompt=null;
+    window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt = e; document.body.classList.add('can-install'); });
+    window.__triggerInstall = async function(){
+      if(!deferredPrompt){ alert('Si le bouton ne s\'affiche pas, utilisez “Ajouter à l\'écran d\'accueil” dans le menu du navigateur.'); return; }
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if(choice.outcome==='accepted'){ console.log('PWA installée'); }
+    }
+  })();
+  </script>
+
+</head>
+<body>
+  <header>
+    <div class="wrap" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <div style="font-weight:800; font-size:18px">Prospects à proximité – MVP</div>
+        <div class="small muted">Localiser des artisans autour de vous et préparer un message avec l'IA.</div>
+      </div>
+      <div class="split" style="max-width: 680px;">
+        <button class="btn" id="btnLocate">📍 Me géolocaliser</button>
+        <button class="btn" id="btnSearch">🔎 Rechercher</button>
+        <button class="btn" id="btnExport">⬇️ Export CSV</button>
+        <button class="btn primary" id="btnInstall" onclick="__triggerInstall()" title="Installer l'application sur le téléphone">📲 Installer l'app</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="row">
+      <section class="card" style="grid-column: span 4;">
+        <h3 style="margin:0 0 10px 0">Paramètres</h3>
+        <div class="grid-2">
+          <div>
+            <label>Latitude</label>
+            <input id="lat" placeholder="48.6" />
+          </div>
+          <div>
+            <label>Longitude</label>
+            <input id="lon" placeholder="7.75" />
+          </div>
+        </div>
+        <div class="grid-3" style="margin-top:10px;">
+          <div>
+            <label>Rayon (km)</label>
+            <select id="radius">
+              <option>3</option>
+              <option selected>5</option>
+              <option>10</option>
+              <option>15</option>
+              <option>20</option>
+            </select>
+          </div>
+          <div>
+            <label>Max. résultats</label>
+            <select id="limit">
+              <option>25</option>
+              <option selected>50</option>
+              <option>100</option>
+              <option>200</option>
+            </select>
+          </div>
+          <div>
+            <label>Tri</label>
+            <select id="sort">
+              <option value="distance" selected>Distance</option>
+              <option value="name">Nom</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Mots-clés (regex, séparés par |)</label>
+          <input id="keywords" value="plomb|plomberie|sanitair|chauffag|clim|pompe à chaleur|PAC|salle de bain|thermique" />
+          <div class="small muted" style="margin-top:6px;">Utilisé pour filtrer les noms/activités (ex: <em>plomberie|chauffage|sanitaire</em>).</div>
+        </div>
+        <div style="margin-top:12px;">
+          <label>Types ciblés</label>
+          <div id="chips" class="split" style="flex-wrap:wrap;">
+          </div>
+          <div class="small muted" style="margin-top:6px;">Sélection multiple. Sources OpenStreetMap (Overpass).</div>
+        </div>
+      </section>
+
+      <section class="card" style="grid-column: span 8;">
+        <div class="split" style="align-items:center; justify-content:space-between;">
+          <h3 style="margin:0">Résultats</h3>
+          <div class="small muted"><span id="count">0</span> entreprises trouvées</div>
+        </div>
+        <div class="list" id="results" style="margin-top:10px;"></div>
+      </section>
+
+      <section class="card" style="grid-column: span 12;">
+        <h3 style="margin:0 0 10px 0">Assistant message (ChatGPT optionnel)</h3>
+        <div class="grid-3">
+          <div>
+            <label>Clé API OpenAI (restera en local)</label>
+            <input id="openaiKey" type="password" placeholder="sk-..." />
+            <div class="small muted" style="margin-top:6px;">Conseil: utilisez une clé dédiée et évitez de la partager. Stockée localement dans votre navigateur.</div>
+          </div>
+          <div>
+            <label>Modèle</label>
+            <select id="openaiModel">
+              <option value="gpt-4o-mini" selected>gpt-4o-mini</option>
+              <option value="gpt-4o">gpt-4o</option>
+              <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+            </select>
+          </div>
+          <div>
+            <label>Tonalité</label>
+            <select id="tone">
+              <option value="pro" selected>Pro simple</option>
+              <option value="convivial">Convivial</option>
+              <option value="percutant">Percutant</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top:10px;">
+          <div>
+            <label>Votre présentation rapide</label>
+            <textarea id="pitch" rows="3" placeholder="Dimitri, CEDEO Strasbourg Nord, solutions sanitaires/chauffage, RDV rapide, Click & Collect, EasySAV, etc."></textarea>
+          </div>
+          <div>
+            <label>Contrainte (ex: sans prix, référence Cedeo obligatoire)</label>
+            <textarea id="constraints" rows="3" placeholder="Toujours sans prix. Inclure la référence CEDEO si besoin. Message court."></textarea>
+          </div>
+        </div>
+        <div style="margin-top:10px;" class="split">
+          <button class="btn" id="btnTemplate">📝 Générer message pour l'entreprise sélectionnée</button>
+          <button class="btn ghost" id="btnCopy">📋 Copier</button>
+        </div>
+        <div style="margin-top:10px;">
+          <label>Message généré</label>
+          <textarea id="aiMsg" rows="6" placeholder="Le message s'affichera ici..."></textarea>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+  // --- Helpers
+  const qs = (s, el=document)=>el.querySelector(s);
+  const qsa = (s, el=document)=>[...el.querySelectorAll(s)];
+  const km = (m)=> (m/1000).toFixed(2);
+  const deg2rad = d => d * Math.PI / 180;
+  const dist = (a, b) => { // haversine meters
+    const R = 6371000; const dLat = deg2rad(b.lat-a.lat); const dLon = deg2rad(b.lon-a.lon);
+    const A = Math.sin(dLat/2)**2 + Math.cos(deg2rad(a.lat))*Math.cos(deg2rad(b.lat))*Math.sin(dLon/2)**2;
+    return 2*R*Math.atan2(Math.sqrt(A), Math.sqrt(1-A));
+  }
+
+  // --- UI Elements
+  const chipsSpec = [
+    { id:'craft_plumber', label:'craft=plumber' },
+    { id:'shop_hvac', label:'shop=hvac' },
+    { id:'shop_bathroom', label:'shop=bathroom_furnishing' },
+    { id:'office_company', label:'office=company' },
+    { id:'service', label:'service (mot-clé)' },
+  ];
+  const chipsEl = qs('#chips');
+  chipsSpec.forEach(c=>{
+    const d = document.createElement('div'); d.className='chip on'; d.textContent=c.label; d.dataset.id=c.id; d.onclick=()=>{ d.classList.toggle('on'); savePrefs(); };
+    chipsEl.appendChild(d);
+  });
+
+  // --- Prefs
+  function savePrefs(){
+    const prefs = {
+      lat: qs('#lat').value, lon: qs('#lon').value, radius: qs('#radius').value,
+      limit: qs('#limit').value, sort: qs('#sort').value, keywords: qs('#keywords').value,
+      chips: qsa('.chip').filter(x=>x.classList.contains('on')).map(x=>x.dataset.id),
+      openaiKey: qs('#openaiKey').value, pitch: qs('#pitch').value, constraints: qs('#constraints').value, tone: qs('#tone').value, model: qs('#openaiModel').value,
+    };
+    localStorage.setItem('prospect_mvp_prefs', JSON.stringify(prefs));
+  }
+  function loadPrefs(){
+    const p = JSON.parse(localStorage.getItem('prospect_mvp_prefs')||'{}');
+    if(!p) return;
+    ['lat','lon','radius','limit','sort','keywords','pitch','constraints'].forEach(k=>{ if(p[k]) qs('#'+k).value=p[k]; });
+    if(p.openaiKey) qs('#openaiKey').value = p.openaiKey;
+    if(p.tone) qs('#tone').value = p.tone;
+    if(p.model) qs('#openaiModel').value = p.model;
+    if(p.chips){ qsa('.chip').forEach(x=>{ x.classList.toggle('on', p.chips.includes(x.dataset.id)); }); }
+  }
+  loadPrefs();
+
+  // --- Geolocate
+  qs('#btnLocate').onclick = async ()=>{
+    if(!navigator.geolocation){ alert('Géolocalisation non disponible.'); return; }
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const { latitude, longitude } = pos.coords;
+      qs('#lat').value = latitude.toFixed(6);
+      qs('#lon').value = longitude.toFixed(6);
+      savePrefs();
+    }, err=>{
+      alert('Erreur géoloc: '+err.message);
+    }, { enableHighAccuracy:true, timeout:10000, maximumAge:0 });
+  };
+
+  // --- Overpass Query Builder
+  function buildOverpassQuery(lat, lon, radiusKm, chipsOn, keywordRegex){
+    const r = radiusKm*1000;
+    const parts = [];
+    const add = (type, filter)=>{
+      parts.push(`node[${filter}](around:${r},${lat},${lon});`);
+      parts.push(`way[${filter}](around:${r},${lat},${lon});`);
+      parts.push(`relation[${filter}](around:${r},${lat},${lon});`);
+    };
+    if(chipsOn.includes('craft_plumber')) add('node', 'craft=plumber');
+    if(chipsOn.includes('shop_hvac')) add('node', 'shop=hvac');
+    if(chipsOn.includes('shop_bathroom')) add('node', 'shop=bathroom_furnishing');
+    if(chipsOn.includes('office_company')) add('node', 'office=company');
+    if(chipsOn.includes('service')){
+      const safe = keywordRegex.replace(/"/g,'');
+      parts.push(`node[~"name|description|craft|shop|office"~"${safe}"](around:${r},${lat},${lon});`);
+      parts.push(`way[~"name|description|craft|shop|office"~"${safe}"](around:${r},${lat},${lon});`);
+      parts.push(`relation[~"name|description|craft|shop|office"~"${safe}"](around:${r},${lat},${lon});`);
+    }
+    const q = `[
+      out:json][timeout:25];(
+        ${parts.join('\n        ')}
+      );out center ${Math.min(parseInt(qs('#limit').value)||50, 500)};`;
+    return q;
+  }
+
+  async function fetchOverpass(q){
+    const url = 'https://overpass-api.de/api/interpreter';
+    const resp = await fetch(url, { method:'POST', body:q, headers:{'Content-Type':'text/plain'} });
+    if(!resp.ok){ throw new Error('Overpass erreur '+resp.status); }
+    return resp.json();
+  }
+
+  function normalizeElements(elements, center){
+    const seen = new Set();
+    const out = [];
+    for(const el of elements){
+      const lat = el.lat || (el.center && el.center.lat);
+      const lon = el.lon || (el.center && el.center.lon);
+      if(lat==null||lon==null) continue;
+      const id = el.tags && (el.tags['name']+lat.toFixed(4)+lon.toFixed(4));
+      if(id && seen.has(id)) continue; if(id) seen.add(id);
+      const name = (el.tags && el.tags['name']) || '∅ Sans nom';
+      const tags = el.tags || {};
+      const d = dist({lat:center.lat,lon:center.lon},{lat,lon});
+      const category = tags.craft || tags.shop || tags.office || 'service';
+      const address = [tags['addr:housenumber'], tags['addr:street'], tags['addr:postcode'], tags['addr:city']].filter(Boolean).join(' ');
+      out.push({ name, lat, lon, distance:d, category, address, raw:el });
+    }
+    return out;
+  }
+
+  function render(list){
+    const sort = qs('#sort').value;
+    list.sort((a,b)=> sort==='distance' ? a.distance-b.distance : (a.name.localeCompare(b.name)) );
+    qs('#count').textContent = list.length;
+    const wrap = qs('#results'); wrap.innerHTML='';
+    list.forEach((p,i)=>{
+      const row = document.createElement('div'); row.className='poi'; row.dataset.idx=i;
+      row.innerHTML = `
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:15px;">${p.name}</div>
+          <div class="small muted">${p.address || 'Adresse inconnue'}</div>
+          <div class="small" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
+            <span class="badge">${p.category}</span>
+            <span class="badge">${km(p.distance)} km</span>
+            <a class="badge" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name+' @ '+p.lat+','+p.lon)}" target="_blank">🗺️ Google Maps</a>
+            <a class="badge" href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=18/${p.lat}/${p.lon}" target="_blank">🗺️ OSM</a>
+            <button class="badge" data-action="select">✅ Sélectionner</button>
+          </div>
+        </div>`;
+      wrap.appendChild(row);
+    });
+  }
+
+  let lastResults = [];
+  let selected = null;
+
+  qs('#results').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button');
+    if(btn && btn.dataset.action==='select'){
+      const row = e.target.closest('.poi');
+      selected = lastResults[parseInt(row.dataset.idx)];
+      qsa('.poi').forEach(r=>r.style.outline='none');
+      row.style.outline = '2px solid var(--accent)';
+      const name = selected?.name || '';
+      const city = selected?.raw?.tags?.['addr:city'] || '';
+      qs('#aiMsg').value = `Objet: CEDEO – coup de main sur ${name} à ${city} ?\n\nBonjour,\n\nJe me permets de vous contacter : je suis Dimitri (CEDEO Strasbourg Nord). On accompagne les installateurs en sanitaire, chauffage et ENR (références CEDEO, dispo rapide, Click & Collect, EasySAV).\n\nAuriez-vous 10 minutes cette semaine pour échanger sur vos chantiers en cours ?\n\nBelle journée,\nDimitri – CEDEO\nTél : …`;
+      savePrefs();
+    }
+  });
+
+  qs('#btnSearch').onclick = async ()=>{
+    try{
+      const lat = parseFloat(qs('#lat').value); const lon = parseFloat(qs('#lon').value);
+      if(Number.isNaN(lat)||Number.isNaN(lon)) { alert('Renseignez une latitude/longitude (ou cliquez sur "Me géolocaliser").'); return; }
+      const chipsOn = qsa('.chip').filter(x=>x.classList.contains('on')).map(x=>x.dataset.id);
+      const q = buildOverpassQuery(lat, lon, parseInt(qs('#radius').value), chipsOn, qs('#keywords').value);
+      savePrefs();
+      qs('#results').innerHTML = '<div class="muted">Recherche en cours…</div>';
+      const data = await fetchOverpass(q);
+      const list = normalizeElements(data.elements||[], {lat,lon});
+      const rx = new RegExp(qs('#keywords').value, 'i');
+      lastResults = list.filter(p=> rx.test(p.name) || rx.test(p.category) || rx.test(JSON.stringify(p.raw.tags||{})) );
+      render(lastResults);
+    }catch(err){
+      console.error(err); alert('Erreur recherche: '+err.message);
+    }
+  };
+
+  // Export CSV
+  qs('#btnExport').onclick = ()=>{
+    if(!lastResults.length){ alert('Aucun résultat à exporter.'); return; }
+    const rows = [['Nom','Catégorie','Adresse','Latitude','Longitude','Distance_km']].concat(
+      lastResults.map(p=>[p.name,p.category,p.address,p.lat,p.lon,km(p.distance)])
+    );
+    const csv = rows.map(r=>r.map(x=>`\"${String(x||'').replace(/\"/g,'\\"')}\"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='prospects.csv'; a.click(); URL.revokeObjectURL(url);
+  };
+
+  // ChatGPT helper
+  async function callOpenAI({key, model, system, user}){
+    const resp = await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':`Bearer ${key}` },
+      body: JSON.stringify({ model, messages:[{role:'system', content: system},{role:'user', content:user}], temperature:0.6 })
+    });
+    if(!resp.ok){ throw new Error('OpenAI: '+resp.status+' '+await resp.text()); }
+    const j = await resp.json();
+    return j.choices?.[0]?.message?.content?.trim() || '';
+  }
+
+  qs('#btnTemplate').onclick = async ()=>{
+    try{
+      const key = qs('#openaiKey').value.trim();
+      if(!key){ alert('Ajoutez votre clé OpenAI.'); return; }
+      const company = selected ? `${selected.name}${selected.address?`, ${selected.address}`:''}` : 'un installateur local';
+      const pitch = qs('#pitch').value || 'Dimitri, CEDEO Strasbourg Nord (sanitaire/chauffage/ENR).';
+      const constraints = qs('#constraints').value || 'Sans prix. Court. Clair. Ton pro.';
+      const tone = qs('#tone').value;
+      const toneText = tone==='convivial' ? 'ton convivial et chaleureux' : tone==='percutant' ? 'ton percutant et direct' : 'ton professionnel simple';
+
+      const system = `Tu es un assistant qui rédige des messages commerciaux français pour un commercial CEDEO. Toujours: pas de prix, rester concis, proposer un RDV, mettre en avant références CEDEO, Click & Collect, EasySAV si pertinent.`;
+      const user = `Écris un court message de prospection pour ${company}. Contexte: ${pitch}. Contraintes: ${constraints}. Adopte un ${toneText}. Ajoute une signature "Dimitri – CEDEO".`;
+      savePrefs();
+      qs('#aiMsg').value = 'Génération en cours…';
+      const txt = await callOpenAI({ key, model: qs('#openaiModel').value, system, user });
+      qs('#aiMsg').value = txt;
+    }catch(err){ alert(err.message); }
+  };
+
+  qs('#btnCopy').onclick = ()=>{ const t=qs('#aiMsg'); t.select(); document.execCommand('copy'); };
+
+  // Auto-save on input changes
+  document.addEventListener('input', (e)=>{
+    if(['INPUT','SELECT','TEXTAREA'].includes(e.target.tagName)) savePrefs();
+  });
+  </script>
+
+  <script>
+    // Indice visuel si installable
+    const installBtn = document.getElementById('btnInstall');
+    function updateInstallVisibility(){
+      const can = document.body.classList.contains('can-install');
+      installBtn.style.display = can ? 'inline-flex' : 'none';
+    }
+    updateInstallVisibility();
+    const obs = new MutationObserver(updateInstallVisibility);
+    obs.observe(document.body, {attributes:true});
+  </script>
+</body>
+</html>
