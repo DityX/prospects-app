@@ -6,13 +6,15 @@
 <title>Prospects proches</title>
 <style>
   :root{--bg:#0f141b;--card:#152033;--muted:#9db2ce;--text:#eaf2ff;--accent:#6558ff;--accent-2:#7a6dff;--chip:#1c2a43;}
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
   .wrap{max-width:840px;margin:32px auto;padding:0 16px}
   .title{font-weight:700;font-size:22px;margin:0 0 6px}
-  .sub{color:var(--muted);margin:0 0 18px}
+  .sub,.city{color:var(--muted);margin:0 0 18px}
   .card{background:var(--card);border-radius:16px;padding:14px 14px 18px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
   .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
   .btn{background:#1b2844;color:#eaf2ff;border:1px solid #223456;border-radius:12px;padding:12px 14px;cursor:pointer;width:100%;text-align:center}
+  .btn:disabled{opacity:.7;cursor:not-allowed}
   .btn:active{transform:translateY(1px)}
   .btn-primary{background:var(--accent);border-color:var(--accent-2);font-weight:600}
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -25,7 +27,11 @@
   .item{background:#0f192d;border:1px solid #203050;border-radius:12px;padding:10px 12px;margin-top:10px}
   .item a{color:#cfe1ff;text-decoration:none}
   .badge{font-size:12px;opacity:.8}
-  .city{font-size:14px;color:var(--muted)}
+  /* spinner */
+  .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;
+    margin-right:8px;vertical-align:-3px}
+  @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -90,24 +96,15 @@ const els = {
   results: document.getElementById('results'),
 };
 
-let state = {
-  lat: null,
-  lon: null,
-  city: null,
-};
-
+let state = { lat: null, lon: null, city: null };
 const LS_KEY = 'prospects_app_state_v2';
 
-function saveState(){
-  localStorage.setItem(LS_KEY, JSON.stringify(state));
-}
+function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 function loadState(){
   try{
     const s = JSON.parse(localStorage.getItem(LS_KEY)||'{}');
-    if(s && typeof s === 'object'){
-      state = {...state, ...s};
-      if(state.city) els.city.textContent = state.city;
-    }
+    state = {...state, ...s};
+    if(state.city) els.city.textContent = state.city;
   }catch{}
 }
 function resetState(){
@@ -116,21 +113,17 @@ function resetState(){
   els.city.textContent = '—';
   els.results.innerHTML = '';
 }
-
 async function reverseGeocode(lat, lon){
   try{
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=fr`, {
-      headers: {'User-Agent':'prospects-app/1.0 (contact: none)'}
-    });
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=fr`,
+      {headers:{'User-Agent':'prospects-app/1.0 (contact: none)'}});
     const data = await res.json();
     return data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '—';
   }catch{ return '—'; }
 }
-
 function toast(msg){
   els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>` + els.results.innerHTML;
 }
-
 function distKm(a,b,c,d){
   const R=6371, toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a), dLon=toRad(d-b);
@@ -138,19 +131,16 @@ function distKm(a,b,c,d){
   return 2*R*Math.asin(Math.sqrt(x));
 }
 
-// --- CATEGORY FILTERS -> Overpass regex per category (French keywords)
+/* Filtres catégories */
 const categoryRegex = {
-  enr: "(clim|climat|pompe\\s*a\\s*chaleur|PAC|photovolta|solair|energie|énergie)",
-  dep: "(depann|dépann|chaudi|chauffag|gaz|fioul|SAV)",
-  pose:"(chauffag|chaudi|installat|pose)",
+  enr: "(clim|climat|pompe\\s*a\\s*chaleur|\\bPAC\\b|photovolta|pv|solair|énergie|energie)",
+  dep: "(d[ée]pann|sav|urgence|chaudi|chauffag|gaz|fioul)",
+  pose:"(install|pose|chauffag|chaudi|pac|clim)",
   san: "(plomb|sanit|salle\\s*de\\s*bain|robinet|canalis|wc|toilet)"
 };
 
-// Build an Overpass QL query
 function buildOverpassQuery(lat, lon, radius, activeCats){
-  // union of selected category regex
   const re = activeCats.map(k => categoryRegex[k]).join('|');
-  // search across node/way/rel names & common tags
   return `
   [out:json][timeout:25];
   (
@@ -158,8 +148,25 @@ function buildOverpassQuery(lat, lon, radius, activeCats){
     way(around:${radius},${lat},${lon})[name~"${re}",i];
     relation(around:${radius},${lat},${lon})[name~"${re}",i];
 
+    node(around:${radius},${lat},${lon})[brand~"${re}",i];
+    node(around:${radius},${lat},${lon})[operator~"${re}",i];
+    node(around:${radius},${lat},${lon})[description~"${re}",i];
+    way(around:${radius},${lat},${lon})[brand~"${re}",i];
+    way(around:${radius},${lat},${lon})[operator~"${re}",i];
+    way(around:${radius},${lat},${lon})[description~"${re}",i];
+
     node(around:${radius},${lat},${lon})[craft=plumber];
     way(around:${radius},${lat},${lon})[craft=plumber];
+    node(around:${radius},${lat},${lon})[craft=hvac];
+    way(around:${radius},${lat},${lon})[craft=hvac];
+    node(around:${radius},${lat},${lon})[shop=bathroom];
+    way(around:${radius},${lat},${lon})[shop=bathroom];
+    node(around:${radius},${lat},${lon})[shop=hvac];
+    way(around:${radius},${lat},${lon})[shop=hvac];
+
+    node(around:${radius},${lat},${lon})["air_conditioning"~"yes|true",i];
+    node(around:${radius},${lat},${lon})["heating"~"yes|true",i];
+    node(around:${radius},${lat},${lon})["plumbing"~"yes|true",i];
   );
   out center tags;`;
 }
@@ -181,7 +188,40 @@ function renderList(list){
   }).join('');
 }
 
-// --- EVENTS
+function setSearching(on){
+  if(on){
+    els.btnSearch.disabled = true;
+    els.btnSearch.innerHTML = '<span class="spinner"></span>Recherche en cours…';
+  }else{
+    els.btnSearch.disabled = false;
+    els.btnSearch.innerHTML = '🔎 Trouver des prospects';
+  }
+}
+
+async function searchNominatimFallback(city, activeCats){
+  const kwMap = {
+    enr: "climatisation pompe à chaleur photovoltaïque",
+    dep: "dépannage chaudière chauffagiste SAV",
+    pose:"installation chauffagiste chaudière PAC",
+    san: "plombier sanitaire salle de bain"
+  };
+  const terms = [...new Set(activeCats.flatMap(k => kwMap[k].split(' ')))].join(' ');
+  const q = encodeURIComponent(terms + ' ' + (city||''));
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=50&q=${q}&accept-language=fr`;
+  const res = await fetch(url, {headers:{'User-Agent':'prospects-app/1.1 (contact: none)'}});
+  const data = await res.json();
+  return (data||[]).map(d => ({
+    name: d.display_name?.split(',')[0] || 'Prospect',
+    lat: parseFloat(d.lat), lon: parseFloat(d.lon),
+    addr: d.display_name,
+    categoryLabel: /plomb|sanit/i.test(d.display_name) ? 'Sanitaire' :
+                   /d[ée]pann|sav/i.test(d.display_name) ? 'Dépannage' :
+                   /chauffag|chaudi/i.test(d.display_name) ? 'Chauffagiste (pose)' : 'ENR',
+    dist: distKm(state.lat, state.lon, parseFloat(d.lat), parseFloat(d.lon))
+  }));
+}
+
+/* EVENTS */
 els.cats.addEventListener('click', (e)=>{
   const chip = e.target.closest('.chip');
   if(!chip) return;
@@ -194,10 +234,7 @@ els.btnReset.addEventListener('click', ()=>{
 });
 
 els.btnGeo.addEventListener('click', async ()=>{
-  if(!('geolocation' in navigator)){
-    toast("La géolocalisation n'est pas disponible sur cet appareil.");
-    return;
-  }
+  if(!('geolocation' in navigator)){ toast("La géolocalisation n'est pas disponible."); return; }
   els.btnGeo.disabled = true;
   els.btnGeo.textContent = '📍 Localisation en cours…';
   navigator.geolocation.getCurrentPosition(async pos=>{
@@ -227,10 +264,9 @@ els.btnSearch.addEventListener('click', async ()=>{
     return;
   }
 
-  els.btnSearch.disabled = true;
-  els.btnSearch.textContent = '🔎 Recherche...';
-
+  setSearching(true);
   try{
+    // 1) Overpass
     const query = buildOverpassQuery(state.lat, state.lon, radius, active);
     const res = await fetch('https://overpass-api.de/api/interpreter', {
       method:'POST',
@@ -240,43 +276,45 @@ els.btnSearch.addEventListener('click', async ()=>{
     const data = await res.json();
 
     const seen = new Set();
-    const prospects = (data.elements||[]).map(el=>{
+    let prospects = (data.elements||[]).map(el=>{
       const center = el.center || {lat: el.lat, lon: el.lon};
-      const name = el.tags?.name || '';
+      const name = el.tags?.name || el.tags?.brand || 'Prospect';
       const addr = [el.tags?.addr_housenumber, el.tags?.addr_street, el.tags?.addr_city].filter(Boolean).join(' ');
-      const key = (name||'') + '@' + (center.lat?.toFixed(5)||'') + ',' + (center.lon?.toFixed(5)||'');
+      const key = name + '@' + (center.lat?.toFixed(5)||'') + ',' + (center.lon?.toFixed(5)||'');
       if(seen.has(key)) return null;
       seen.add(key);
 
-      const label = (()=> {
-        const n = (name||'').toLowerCase();
-        if(new RegExp(categoryRegex.enr,'i').test(n)) return 'ENR';
-        if(new RegExp(categoryRegex.dep,'i').test(n)) return 'Dépannage';
-        if(new RegExp(categoryRegex.pose,'i').test(n)) return 'Chauffagiste (pose)';
-        if(new RegExp(categoryRegex.san,'i').test(n) || el.tags?.craft==='plumber') return 'Sanitaire';
-        return 'Prospect';
-      })();
+      const line = (name + ' ' + (el.tags?.brand||'') + ' ' + (el.tags?.description||'')).toLowerCase();
+      const label =
+        /plomb|sanit/.test(line) || el.tags?.craft==='plumber' ? 'Sanitaire' :
+        /d[ée]pann|sav/.test(line) ? 'Dépannage' :
+        /chauffag|chaudi/.test(line) ? 'Chauffagiste (pose)' :
+        /clim|pac|photovolta|solair|énergie|energie/.test(line) ? 'ENR' : 'Prospect';
 
       return {
-        name: name || (el.tags?.brand || 'Prospect'),
-        lat: center.lat, lon: center.lon,
-        addr, categoryLabel: label,
+        name, lat: center.lat, lon: center.lon, addr,
+        categoryLabel: label,
         dist: distKm(state.lat, state.lon, center.lat, center.lon)
       };
     }).filter(Boolean)
-      .sort((a,b)=> a.dist - b.dist)
-      .slice(0, limit);
+      .sort((a,b)=> a.dist - b.dist);
 
-    renderList(prospects);
+    // 2) Fallback Nominatim si rien
+    if(!prospects.length){
+      toast('Aucun résultat Overpass, je tente une recherche élargie…');
+      const nomi = await searchNominatimFallback(state.city, active);
+      prospects = nomi.sort((a,b)=> a.dist - b.dist);
+    }
+
+    renderList(prospects.slice(0, limit));
   }catch(e){
-    toast("Erreur lors de la recherche (API Overpass saturée ? Réessaie).");
+    toast("Erreur de recherche (Overpass/Nominatim). Réessaie dans quelques instants.");
   }finally{
-    els.btnSearch.disabled = false;
-    els.btnSearch.textContent = '🔎 Trouver des prospects';
+    setSearching(false);
   }
 });
 
-// init
+/* init */
 loadState();
 </script>
 </body>
