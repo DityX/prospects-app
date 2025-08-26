@@ -1,239 +1,283 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Prospects proches – Mobile</title>
-  <style>
-    :root{--bg:#0b0f17;--card:#121829;--txt:#e7ecf3;--muted:#92a1b2;--line:#1e2a3f;--accent:#4f46e5}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0b0f17,#0b0f17d0);backdrop-filter:blur(4px);padding:12px 16px;border-bottom:1px solid var(--line)}
-    .wrap{max-width:680px;margin:0 auto;padding:12px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px}
-    .row{display:grid;gap:10px}
-    .btn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:14px;border:1px solid #24314b;background:#19243a;color:var(--txt);font-weight:700}
-    .btn.primary{background:var(--accent);border-color:transparent}
-    .btn.ghost{background:transparent}
-    .seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-    .seg button{flex:1;padding:12px;border:0;background:#0f1422;color:var(--txt)}
-    .seg button.on{background:#222a42}
-    label{font-size:12px;color:var(--muted);display:block;margin:6px 2px}
-    select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:#0f1422;color:var(--txt)}
-    .badges{display:flex;flex-wrap:wrap;gap:6px}
-    .badge{font-size:12px;background:#1a2240;border:1px solid #2a3561;border-radius:999px;padding:4px 8px;color:#cfe1ff}
-    .poi{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:14px;padding:12px;background:#0f1422}
-    a{color:#9ec6ff;text-decoration:none}
-    a:hover{text-decoration:underline}
-    .muted{color:var(--muted)}
-    .big{font-size:18px;font-weight:800}
-    .city{font-weight:800}
-  </style>
-  <meta name="theme-color" content="#0b0f17"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="Prospects Mobile"/>
-  <script>
-  // PWA minimal (manifest + SW à la volée)
-  (function(){
-    function icon(size){const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');g.fillStyle='#0b0f17';g.fillRect(0,0,size,size);g.fillStyle='#4f46e5';g.beginPath();g.arc(size/2,size/2,size*0.42,0,Math.PI*2);g.fill();g.fillStyle='#fff';g.font=`${Math.floor(size*0.42)}px system-ui`;g.textAlign='center';g.textBaseline='middle';g.fillText('📍',size/2,size/2+size*0.04);return c.toDataURL('image/png')} 
-    const manifest={name:'Prospects proches',short_name:'Prospects',start_url:'./',display:'standalone',theme_color:'#0b0f17',background_color:'#0b0f17',icons:[{src:icon(192),sizes:'192x192',type:'image/png',purpose:'any maskable'},{src:icon(512),sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
-    const u=URL.createObjectURL(new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'}));const l=document.createElement('link');l.rel='manifest';l.href=u;document.head.appendChild(l);
-    const sw=`const C='prospects-mob-v1';self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll([self.location.pathname])));self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))));self.clients.claim()});self.addEventListener('fetch',e=>{const r=e.request;if(r.url.includes('overpass-api')||r.url.includes('nominatim')){e.respondWith(fetch(r).catch(()=>caches.match(r)))}else{e.respondWith(caches.match(r).then(m=>m||fetch(r).then(res=>{const cl=res.clone();caches.open(C).then(c=>c.put(r,cl));return res}).catch(()=>caches.match(self.location.pathname))))}})`;
-    if('serviceWorker' in navigator){navigator.serviceWorker.register(URL.createObjectURL(new Blob([sw],{type:'text/javascript'})))}
-  })();
-  </script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Prospects proches</title>
+<style>
+  :root{--bg:#0f141b;--card:#152033;--muted:#9db2ce;--text:#eaf2ff;--accent:#6558ff;--accent-2:#7a6dff;--chip:#1c2a43;}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  .wrap{max-width:840px;margin:32px auto;padding:0 16px}
+  .title{font-weight:700;font-size:22px;margin:0 0 6px}
+  .sub{color:var(--muted);margin:0 0 18px}
+  .card{background:var(--card);border-radius:16px;padding:14px 14px 18px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .btn{background:#1b2844;color:#eaf2ff;border:1px solid #223456;border-radius:12px;padding:12px 14px;cursor:pointer;width:100%;text-align:center}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--accent);border-color:var(--accent-2);font-weight:600}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:#eaf2ff}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+  .chip{background:var(--chip);border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:8px 12px;cursor:pointer;user-select:none}
+  .chip.active{background:var(--accent);border-color:var(--accent-2);color:#fff}
+  .hint{color:var(--muted);font-size:13px;margin-top:-2px}
+  .results{margin-top:14px}
+  .item{background:#0f192d;border:1px solid #203050;border-radius:12px;padding:10px 12px;margin-top:10px}
+  .item a{color:#cfe1ff;text-decoration:none}
+  .badge{font-size:12px;opacity:.8}
+  .city{font-size:14px;color:var(--muted)}
+</style>
 </head>
 <body>
-  <header>
-    <div class="wrap">
-      <div class="big">Prospects proches</div>
-      <div class="muted" id="cityLine">Ville : <span class="city" id="city">—</span></div>
-    </div>
-  </header>
-  <div id="toast" style="position:fixed;left:12px;right:12px;bottom:12px;background:#0f1422;border:1px solid #27314c;border-radius:12px;padding:10px 12px;color:#e7ecf3;display:none;z-index:99"></div>
-  <main class="wrap row" style="padding-bottom:80px;">
-    <section class="card row">
-      <div class="row" style="gap:8px;">
-        <button class="btn" id="btnLocate">📍 Me géolocaliser</button>
-        <button class="btn ghost" id="btnReset">♻️ Réinitialiser le cache</button>
+  <div class="wrap">
+    <h1 class="title">Prospects proches</h1>
+    <div class="city">Ville : <span id="city">—</span></div>
+
+    <div class="card">
+      <div class="row">
+        <button id="btnGeo" class="btn">📍 Me géolocaliser</button>
       </div>
-      <div class="row" style="grid-template-columns:1fr 1fr; gap:8px;">
-        <div>
-          <label>Rayon</label>
+      <div class="row">
+        <button id="btnReset" class="btn">♻️ Réinitialiser le cache</button>
+      </div>
+
+      <div class="grid">
+        <label>
+          <div>Rayon</div>
           <select id="radius">
-            <option value="5">5 km</option>
-            <option value="10" selected>10 km</option>
-            <option value="15">15 km</option>
-            <option value="20">20 km</option>
+            <option value="5000">5 km</option>
+            <option value="10000" selected>10 km</option>
+            <option value="15000">15 km</option>
+            <option value="20000">20 km</option>
           </select>
-        </div>
-        <div>
-          <label>Nombre max</label>
+        </label>
+        <label>
+          <div>Nombre max</div>
           <select id="limit">
-            <option>3</option>
-            <option selected>5</option>
-            <option>10</option>
+            <option value="3">3</option>
+            <option value="5" selected>5</option>
+            <option value="10">10</option>
           </select>
-        </div>
+        </label>
       </div>
-      <div>
-        <label>Catégories</label>
-        <div class="seg" id="catSeg">
-          <button data-id="enr" class="on">ENR</button>
-          <button data-id="dep_ch" class="">Dépannage chauffage</button>
-          <button data-id="pose_ch" class="">Chauffagiste (pose)</button>
-          <button data-id="sanitaire" class="">Sanitaire</button>
-        </div>
-        <div class="muted" style="margin-top:6px;font-size:12px">Touchez pour (dé)sélectionner une ou plusieurs catégories.</div>
+
+      <div style="margin-top:8px">Catégories</div>
+      <div id="cats" class="chips">
+        <div class="chip active" data-key="enr">ENR</div>
+        <div class="chip" data-key="dep">Dépannage chauffage</div>
+        <div class="chip" data-key="pose">Chauffagiste (pose)</div>
+        <div class="chip" data-key="san">Sanitaire</div>
       </div>
-      <div class="row" style="gap:8px; margin-top:6px;">
-        <button class="btn primary" id="btnSearch">🔎 Trouver des prospects</button>
+      <div class="hint">Touchez pour (dé)sélectionner une ou plusieurs catégories.</div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button>
       </div>
-    </section>
 
-    <section class="row" id="resultsWrap"></section>
-  </main>
+      <div id="results" class="results"></div>
+    </div>
+  </div>
 
-  <script>
-  const qs=(s,el=document)=>el.querySelector(s); const qsa=(s,el=document)=>[...el.querySelectorAll(s)];
-  const toast=(msg)=>{ const t=qs('#toast'); t.textContent=msg; t.style.display='block'; clearTimeout(window.__t); window.__t=setTimeout(()=>t.style.display='none', 3500); }
-  const deg2rad=d=>d*Math.PI/180; const R=6371000; const dist=(a,b)=>{const dLat=deg2rad(b.lat-a.lat), dLon=deg2rad(b.lon-a.lon);const A=Math.sin(dLat/2)**2+Math.cos(deg2rad(a.lat))*Math.cos(deg2rad(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.atan2(Math.sqrt(A),Math.sqrt(1-A))};
+<script>
+const els = {
+  city: document.getElementById('city'),
+  btnGeo: document.getElementById('btnGeo'),
+  btnReset: document.getElementById('btnReset'),
+  btnSearch: document.getElementById('btnSearch'),
+  radius: document.getElementById('radius'),
+  limit: document.getElementById('limit'),
+  cats: document.getElementById('cats'),
+  results: document.getElementById('results'),
+};
 
-  const CATS = {
-    enr: { label:'ENR', keywords: 'clim|climatisation|pompe à chaleur|PAC|aérotherm|géotherm' },
-    dep_ch: { label:'Dépannage chauffage', keywords: 'dépann|urgence|chaudi[eè]re|panne|chauffage' },
-    pose_ch: { label:'Chauffagiste (pose)', keywords: 'chauffag|pose|install(ation|er)|chaudi[eè]re|radiateur' },
-    sanitaire: { label:'Sanitaire', keywords: 'plomb|sanitair|salle de bain|douche|wc' , osm: 'craft=plumber'},
-  };
+let state = {
+  lat: null,
+  lon: null,
+  city: null,
+};
 
-  // UI cats toggles
-  qsa('#catSeg button').forEach(b=> b.onclick=()=> b.classList.toggle('on'));
+const LS_KEY = 'prospects_app_state_v2';
 
-  // Reverse geocode city with Nominatim
-  async function getCity(lat,lon){
-    try{
-      const url=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
-      const r = await fetch(url,{headers:{'Accept':'application/json'}});
-      const j = await r.json();
-      const c = j.address && (j.address.city || j.address.town || j.address.village || j.address.municipality || j.address.county) || '—';
-      qs('#city').textContent = c;
-    }catch(e){ console.warn('reverse geocode',e); qs('#city').textContent='—'; }
-  }
-
-  let center = null; // {lat,lon}
-
-  qs('#btnLocate').onclick = async () => {
-    try{
-      if(!('geolocation' in navigator)) { toast('Géolocalisation non disponible sur ce navigateur.'); return; }
-      // Check permission when available
-      if(navigator.permissions && navigator.permissions.query){
-        try{
-          const p = await navigator.permissions.query({name:'geolocation'});
-          if(p.state==='denied'){
-            toast('Accès localisation refusé. Active-le dans les réglages du site.');
-            // Guidance by platform
-            const ua = navigator.userAgent.toLowerCase();
-            if(/iphone|ipad|ipod/.test(ua)){
-              setTimeout(()=>alert('iPhone : Réglages > Confidentialité > Service de localisation > Safari Websites > "Pendant l\'utilisation".
-Puis rouvrez l\'app et réessayez.')),50;
-            } else {
-              setTimeout(()=>alert('Android : Chrome > cadenas / i > Autorisations du site > Localisation > Autoriser.
-Puis réessayez.')),50;
-            }
-            return;
-          }
-        }catch(e){}
-      }
-      toast('Recherche de la position…');
-      navigator.geolocation.getCurrentPosition(pos=>{
-        center = { lat: +pos.coords.latitude.toFixed(6), lon: +pos.coords.longitude.toFixed(6) };
-        getCity(center.lat, center.lon);
-        toast('Position détectée.');
-      }, err=>{
-        toast('Erreur géoloc : '+err.message);
-      }, { enableHighAccuracy:true, timeout:20000, maximumAge:0 });
-    }catch(e){ toast('Erreur : '+e.message); }
-  };
-      getCity(center.lat, center.lon);
-    }, err=> alert('Erreur géoloc: '+err.message), {enableHighAccuracy:true,timeout:10000,maximumAge:0});
-  };
-
-  function buildOverpassQuery(lat,lon,km,cats){
-    const r = km*1000; const parts=[];
-    const addFilter = f=>{ parts.push(`node[${f}](around:${r},${lat},${lon});`); parts.push(`way[${f}](around:${r},${lat},${lon});`); parts.push(`relation[${f}](around:${r},${lat},${lon});`); };
-    // Always include keyword search on name/description for selected cats
-    const kw = cats.map(c=>CATS[c].keywords).filter(Boolean).join('|');
-    if(kw){ const safe=kw.replace(/"/g,''); ['node','way','relation'].forEach(t=> parts.push(`${t}[~"name|description|craft|shop|office"~"${safe}"](around:${r},${lat},${lon});`)); }
-    // Add strict OSM tags where known (e.g., craft=plumber)
-    cats.forEach(c=>{ if(CATS[c].osm){ addFilter(CATS[c].osm); } });
-    return `
-[out:json][timeout:25];(
-${parts.join('
-')}
-);out center ${Math.min(200, 60)};`;
-  }
-
-  async function fetchOverpass(q){
-    const resp = await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'text/plain'},body:q});
-    if(!resp.ok) throw new Error('Overpass '+resp.status); return resp.json();
-  }
-
-  function normalize(elements){
-    const seen=new Set(); const out=[];
-    for(const el of elements){
-      const lat = el.lat || (el.center&&el.center.lat); const lon = el.lon || (el.center&&el.center.lon); if(lat==null||lon==null) continue;
-      const key=(el.tags?.name||'')+lat.toFixed(4)+lon.toFixed(4); if(seen.has(key)) continue; seen.add(key);
-      const name=el.tags?.name || '∅ Sans nom';
-      const tags=el.tags||{}; const address=[tags['addr:housenumber'],tags['addr:street'],tags['addr:postcode'],tags['addr:city']].filter(Boolean).join(' ');
-      out.push({name,lat,lon,address,tags});
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
+function loadState(){
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_KEY)||'{}');
+    if(s && typeof s === 'object'){
+      state = {...state, ...s};
+      if(state.city) els.city.textContent = state.city;
     }
-    return out;
-  }
+  }catch{}
+}
+function resetState(){
+  localStorage.removeItem(LS_KEY);
+  state = {lat:null, lon:null, city:null};
+  els.city.textContent = '—';
+  els.results.innerHTML = '';
+}
 
-  function render(list){
-    const wrap=qs('#resultsWrap'); wrap.innerHTML='';
-    if(!list.length){ wrap.innerHTML = `<div class="muted">Aucun résultat avec ces filtres.</div>`; return; }
-    list.forEach(p=>{
-      const d = dist(center,{lat:p.lat,lon:p.lon});
-      const el=document.createElement('div'); el.className='poi';
-      el.innerHTML=`<div style="flex:1;">
-        <div style="font-weight:800;">${p.name}</div>
-        <div class="muted" style="font-size:12px;">${(d/1000).toFixed(2)} km • ${p.address||'Adresse inconnue'}</div>
-        <div class="badges" style="margin-top:6px;">
-          <a class="badge" target="_blank" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.name+' @ '+p.lat+','+p.lon)}">Google Maps</a>
-          <a class="badge" target="_blank" href="https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=18/${p.lat}/${p.lon}">OSM</a>
-        </div>
-      </div>`;
-      wrap.appendChild(el);
+async function reverseGeocode(lat, lon){
+  try{
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=fr`, {
+      headers: {'User-Agent':'prospects-app/1.0 (contact: none)'}
     });
+    const data = await res.json();
+    return data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '—';
+  }catch{ return '—'; }
+}
+
+function toast(msg){
+  els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>` + els.results.innerHTML;
+}
+
+function distKm(a,b,c,d){
+  const R=6371, toRad=x=>x*Math.PI/180;
+  const dLat=toRad(c-a), dLon=toRad(d-b);
+  const x= Math.sin(dLat/2)**2 + Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(x));
+}
+
+// --- CATEGORY FILTERS -> Overpass regex per category (French keywords)
+const categoryRegex = {
+  enr: "(clim|climat|pompe\\s*a\\s*chaleur|PAC|photovolta|solair|energie|énergie)",
+  dep: "(depann|dépann|chaudi|chauffag|gaz|fioul|SAV)",
+  pose:"(chauffag|chaudi|installat|pose)",
+  san: "(plomb|sanit|salle\\s*de\\s*bain|robinet|canalis|wc|toilet)"
+};
+
+// Build an Overpass QL query
+function buildOverpassQuery(lat, lon, radius, activeCats){
+  // union of selected category regex
+  const re = activeCats.map(k => categoryRegex[k]).join('|');
+  // search across node/way/rel names & common tags
+  return `
+  [out:json][timeout:25];
+  (
+    node(around:${radius},${lat},${lon})[name~"${re}",i];
+    way(around:${radius},${lat},${lon})[name~"${re}",i];
+    relation(around:${radius},${lat},${lon})[name~"${re}",i];
+
+    node(around:${radius},${lat},${lon})[craft=plumber];
+    way(around:${radius},${lat},${lon})[craft=plumber];
+  );
+  out center tags;`;
+}
+
+function renderList(list){
+  if(!list.length){
+    els.results.innerHTML = `<div class="item">Aucun résultat dans ce périmètre avec ces catégories.</div>`;
+    return;
+  }
+  els.results.innerHTML = list.map(p => {
+    const gmaps = `https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}`;
+    return `
+    <div class="item">
+      <div><strong>${p.name || 'Prospect sans nom'}</strong></div>
+      <div class="badge">${p.categoryLabel} · ${p.dist.toFixed(1)} km</div>
+      ${p.addr ? `<div class="badge">${p.addr}</div>`:''}
+      <div style="margin-top:6px"><a href="${gmaps}" target="_blank" rel="noopener">➡️ Ouvrir dans Google Maps</a></div>
+    </div>`;
+  }).join('');
+}
+
+// --- EVENTS
+els.cats.addEventListener('click', (e)=>{
+  const chip = e.target.closest('.chip');
+  if(!chip) return;
+  chip.classList.toggle('active');
+});
+
+els.btnReset.addEventListener('click', ()=>{
+  resetState();
+  toast('Cache réinitialisé.');
+});
+
+els.btnGeo.addEventListener('click', async ()=>{
+  if(!('geolocation' in navigator)){
+    toast("La géolocalisation n'est pas disponible sur cet appareil.");
+    return;
+  }
+  els.btnGeo.disabled = true;
+  els.btnGeo.textContent = '📍 Localisation en cours…';
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const {latitude, longitude} = pos.coords;
+    state.lat = latitude; state.lon = longitude;
+    state.city = await reverseGeocode(latitude, longitude);
+    els.city.textContent = state.city;
+    saveState();
+    els.btnGeo.textContent = '📍 Me géolocaliser';
+    els.btnGeo.disabled = false;
+    toast('Position enregistrée ✅');
+  }, err=>{
+    els.btnGeo.textContent = '📍 Me géolocaliser';
+    els.btnGeo.disabled = false;
+    toast("Impossible d'obtenir la position (permission refusée ?).");
+  }, {enableHighAccuracy:true, timeout:15000, maximumAge:30000});
+});
+
+els.btnSearch.addEventListener('click', async ()=>{
+  const active = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
+  if(!active.length){ toast('Sélectionne au moins une catégorie.'); return; }
+  const radius = parseInt(els.radius.value,10);
+  const limit  = parseInt(els.limit.value,10);
+
+  if(!(state.lat && state.lon)){
+    toast('Clique d’abord sur “Me géolocaliser”.');
+    return;
   }
 
-  qs('#btnSearch').onclick = async ()=>{
-    try{
-      if(!center){ alert('Clique d\'abord sur "Me géolocaliser".'); return; }
-      const cats = qsa('#catSeg button.on').map(b=>b.dataset.id); if(!cats.length){ alert('Choisis au moins une catégorie.'); return; }
-      const q = buildOverpassQuery(center.lat, center.lon, parseInt(qs('#radius').value), cats);
-      qs('#resultsWrap').innerHTML = '<div class="muted">Recherche en cours…</div>';
-      const data = await fetchOverpass(q);
-      let list = normalize(data.elements||[]);
-      // Tri par distance à la fin + limite
-      list.sort((a,b)=>dist(center,{lat:a.lat,lon:a.lon})-dist(center,{lat:b.lat,lon:b.lon}));
-      const max = parseInt(qs('#limit').value)||5; list = list.slice(0, max);
-      render(list);
-    }catch(err){ console.error(err); alert('Erreur: '+err.message); }
-  }
+  els.btnSearch.disabled = true;
+  els.btnSearch.textContent = '🔎 Recherche...';
 
-  // Auto-locate at first load if possible
-  if(navigator.geolocation){ navigator.geolocation.getCurrentPosition(p=>{center={lat:+p.coords.latitude.toFixed(6),lon:+p.coords.longitude.toFixed(6)}; getCity(center.lat,center.lon);}, ()=>{}); }
-    qs('#btnReset').onclick = async ()=>{
-    try{
-      // Clear caches + unregister SW then reload
-      if('caches' in window){ const keys = await caches.keys(); await Promise.all(keys.map(k=>caches.delete(k))); }
-      if('serviceWorker' in navigator){ const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.unregister())); }
-      localStorage.clear();
-      toast('Cache vidé. Rechargement…'); setTimeout(()=>location.reload(),600);
-    }catch(e){ toast('Impossible de vider le cache : '+e.message); }
-  };
-  </script>
+  try{
+    const query = buildOverpassQuery(state.lat, state.lon, radius, active);
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method:'POST',
+      body: query,
+      headers: {'Content-Type':'text/plain; charset=UTF-8'}
+    });
+    const data = await res.json();
+
+    const seen = new Set();
+    const prospects = (data.elements||[]).map(el=>{
+      const center = el.center || {lat: el.lat, lon: el.lon};
+      const name = el.tags?.name || '';
+      const addr = [el.tags?.addr_housenumber, el.tags?.addr_street, el.tags?.addr_city].filter(Boolean).join(' ');
+      const key = (name||'') + '@' + (center.lat?.toFixed(5)||'') + ',' + (center.lon?.toFixed(5)||'');
+      if(seen.has(key)) return null;
+      seen.add(key);
+
+      const label = (()=> {
+        const n = (name||'').toLowerCase();
+        if(new RegExp(categoryRegex.enr,'i').test(n)) return 'ENR';
+        if(new RegExp(categoryRegex.dep,'i').test(n)) return 'Dépannage';
+        if(new RegExp(categoryRegex.pose,'i').test(n)) return 'Chauffagiste (pose)';
+        if(new RegExp(categoryRegex.san,'i').test(n) || el.tags?.craft==='plumber') return 'Sanitaire';
+        return 'Prospect';
+      })();
+
+      return {
+        name: name || (el.tags?.brand || 'Prospect'),
+        lat: center.lat, lon: center.lon,
+        addr, categoryLabel: label,
+        dist: distKm(state.lat, state.lon, center.lat, center.lon)
+      };
+    }).filter(Boolean)
+      .sort((a,b)=> a.dist - b.dist)
+      .slice(0, limit);
+
+    renderList(prospects);
+  }catch(e){
+    toast("Erreur lors de la recherche (API Overpass saturée ? Réessaie).");
+  }finally{
+    els.btnSearch.disabled = false;
+    els.btnSearch.textContent = '🔎 Trouver des prospects';
+  }
+});
+
+// init
+loadState();
+</script>
 </body>
 </html>
