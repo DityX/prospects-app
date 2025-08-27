@@ -25,6 +25,7 @@
   .badge{font-size:12px;opacity:.85}
   .meta{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
   .row-slim{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .legend{margin-top:14px;font-size:14px;color:#9db2ce}
   .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
@@ -61,7 +62,7 @@
     <div class="row-slim">
       <label style="display:flex;align-items:center;gap:8px">
         <input type="checkbox" id="openNow" />
-        Ouvert maintenant
+        Uniquement les pros ouverts actuellement
       </label>
       <button id="btnExport" class="btn">⬇️ Export CSV</button>
       <button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button>
@@ -74,14 +75,15 @@
     </div>
 
     <div id="results" class="results"></div>
+    <div class="legend">
+      🟢 = Ouvert &nbsp; | &nbsp; 🔴 = Fermé &nbsp; | &nbsp; ⚪ = Horaires non renseignés
+    </div>
   </div>
 </div>
 
 <script>
-// ⬇️ URL de TON Worker Cloudflare
 const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
-// nombre de pages Nearby à charger (1 = ~20, 3 = ~60)
-const PAGES = 3;
+const PAGES = 2;
 
 const els = {
   city: document.getElementById('city'),
@@ -97,7 +99,6 @@ const els = {
 };
 let state = {lat:null, lon:null, city:null, results:[]};
 
-// --- helpers ---
 function setSearching(on){
   els.btnSearch.disabled = on;
   els.btnSearch.innerHTML = on ? '<span class="spinner"></span>Recherche en cours…' : '🔎 Trouver des prospects';
@@ -109,42 +110,14 @@ function distKm(a,b,c,d){
   const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a)) * Math.cos(toRad(c)) * Math.sin(dLon/2)**2;
   return 2 * R * Math.asin(Math.sqrt(x));
 }
-const sleep = ms => new Promise(r=>setTimeout(r, ms));
 
-function savePrefs(){
-  const prefs = {
-    radius: els.radius.value,
-    limit: els.limit.value,
-    sort: els.sort.value,
-    openNow: els.openNow.checked,
-    cats: [...document.querySelectorAll('.chip')].map(c=>({k:c.dataset.key,a:c.classList.contains('active')}))
-  };
-  localStorage.setItem('prefs', JSON.stringify(prefs));
-}
-function loadPrefs(){
-  try{
-    const p = JSON.parse(localStorage.getItem('prefs')||"{}");
-    if(p.radius) els.radius.value = p.radius;
-    if(p.limit) els.limit.value = p.limit;
-    if(p.sort) els.sort.value = p.sort;
-    if(typeof p.openNow === "boolean") els.openNow.checked = p.openNow;
-    if(p.cats) {
-      const map = new Map(p.cats.map(x=>[x.k,x.a]));
-      document.querySelectorAll('.chip').forEach(c=>{
-        c.classList.toggle('active', map.get(c.dataset.key) !== false);
-      });
-    }
-  }catch{}
-}
-loadPrefs();
-
-// --- UI events ---
+// chips
 els.cats.addEventListener('click', e=>{
   const c=e.target.closest('.chip'); if(!c) return;
-  c.classList.toggle('active'); savePrefs();
+  c.classList.toggle('active');
 });
-['radius','limit','sort','openNow'].forEach(id=>els[id].addEventListener('change', savePrefs));
 
+// géoloc
 els.btnGeo.addEventListener('click',()=>{
   navigator.geolocation.getCurrentPosition(async pos=>{
     state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
@@ -156,6 +129,7 @@ els.btnGeo.addEventListener('click',()=>{
   },()=>toast("Impossible d'obtenir la position (autorisation ?)"));
 });
 
+// recherche
 els.btnSearch.addEventListener('click', async()=>{
   if(!(state.lat&&state.lon)){ toast("Clique d’abord sur Me géolocaliser."); return; }
   const radius = parseInt(els.radius.value,10);
@@ -163,48 +137,38 @@ els.btnSearch.addEventListener('click', async()=>{
   const sort   = els.sort.value;
   const openNow = els.openNow.checked;
   const kws = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
-  if(!kws.length){ toast("Sélectionne au moins 1 catégorie."); return; }
 
   setSearching(true);
   try{
     let rows = [];
     for(const kw of kws){
-      let pageToken = "";
-      for(let page=0; page<PAGES; page++){
-        const url = `${WORKER_URL}/nearby?lat=${state.lat}&lon=${state.lon}&radius=${radius}&keyword=${encodeURIComponent(kw)}&opennow=${openNow}${pageToken?`&page_token=${pageToken}`:""}`;
-        const r = await fetch(url);
-        const j = await r.json();
-        for(const p of (j.results||[])){
-          const lat=p.geometry.location.lat, lon=p.geometry.location.lng;
-          rows.push({
-            place_id:p.place_id, name:p.name, addr:p.vicinity||"",
-            lat, lon, kw, dist: distKm(state.lat,state.lon,lat,lon)
-          });
-        }
-        if(j.next_page_token && page < PAGES-1){
-          pageToken = j.next_page_token;
-          await sleep(1500); // Google demande un petit délai
-        }else break;
+      const url = `${WORKER_URL}/nearby?lat=${state.lat}&lon=${state.lon}&radius=${radius}&keyword=${encodeURIComponent(kw)}&opennow=${openNow}`;
+      const r = await fetch(url);
+      const j = await r.json();
+      for(const p of (j.results||[])){
+        const lat=p.geometry.location.lat, lon=p.geometry.location.lng;
+        const status = p.opening_hours ? (p.opening_hours.open_now ? "open" : "closed") : "unknown";
+        rows.push({
+          place_id:p.place_id, name:p.name, addr:p.vicinity||"",
+          lat, lon, kw, dist: distKm(state.lat,state.lon,lat,lon), status
+        });
       }
     }
-    // tri
-    rows = rows.sort((a,b)=> (sort==="name" ? a.name.localeCompare(b.name) : a.dist-b.dist))
-               .slice(0, limit);
+    rows = rows.sort((a,b)=> (sort==="name" ? a.name.localeCompare(b.name) : a.dist-b.dist)).slice(0, limit);
     state.results = rows;
 
     if(!rows.length){ toast("Aucun résultat trouvé."); return; }
     els.results.innerHTML = rows.map((p,i)=>`
-      <div class="item" id="row-${i}">
+      <div class="item">
         <div><strong>${p.name}</strong></div>
         <div class="meta">
+          <span>${p.status==="open"?"🟢 Ouvert":p.status==="closed"?"🔴 Fermé":"⚪ Horaires non renseignés"}</span>
           <span class="badge">${p.kw} · ${p.dist.toFixed(1)} km</span>
           <span class="badge">${p.addr}</span>
         </div>
         <div class="row-slim">
-          <a class="btn" target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Ouvrir dans Google Maps</a>
-          <button class="btn" onclick="showDetails('${p.place_id}','row-${i}')">📞 Coordonnées</button>
+          <a class="btn" target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Maps</a>
         </div>
-        <div class="badge" id="det-${i}" style="margin-top:6px;display:none"></div>
       </div>
     `).join("");
   }catch(e){
@@ -213,36 +177,6 @@ els.btnSearch.addEventListener('click', async()=>{
     setSearching(false);
   }
 });
-
-// export CSV
-els.btnExport.addEventListener('click', ()=>{
-  const rows = state.results||[];
-  if(!rows.length){ toast("Rien à exporter (lance une recherche)."); return; }
-  const header = "Nom;Adresse;Catégorie;Distance (km);Latitude;Longitude\n";
-  const body = rows.map(r=>[
-    r.name.replace(/;/g,","), r.addr.replace(/;/g,","), r.kw, r.dist.toFixed(2), r.lat, r.lon
-  ].join(";")).join("\n");
-  const blob = new Blob([header+body], {type:"text/csv;charset=utf-8"});
-  const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: "prospects.csv"});
-  a.click(); URL.revokeObjectURL(a.href);
-});
-
-// détails (téléphone + site)
-async function showDetails(placeId,rowId){
-  const el = document.getElementById(`det-${rowId.split("-")[1]}`);
-  if(el.style.display==="block"){ el.style.display="none"; return; }
-  el.style.display="block"; el.textContent="Chargement…";
-  try{
-    const r = await fetch(`${WORKER_URL}/details?place_id=${encodeURIComponent(placeId)}`);
-    const j = await r.json();
-    const d = j.result || {};
-    const tel = d.formatted_phone_number || d.international_phone_number || "—";
-    const web = d.website ? `<a target="_blank" href="${d.website}">${d.website}</a>` : "—";
-    el.innerHTML = `☎️ ${tel} &nbsp; • &nbsp; 🌐 ${web}`;
-  }catch{
-    el.textContent = "Impossible de récupérer les coordonnées.";
-  }
-}
 </script>
 </body>
 </html>
