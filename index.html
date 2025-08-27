@@ -1,49 +1,33 @@
-<!--
-Prospects proches – Patch 1.3.0 (Auth MVP)
-Base: 1.2.2
-Ajouts: Authentification e‑mail/mot de passe (signup/login/logout) via Worker + JWT HttpOnly
--->
 <!doctype html>
 <html lang="fr">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Prospects proches</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#6558ff">
-<style>
-  body{margin:0;background:#0f141b;color:#eaf2ff;font:16px/1.4 system-ui}
-  .wrap{max-width:880px;margin:32px auto;padding:0 16px}
-  .title{font-weight:700;font-size:22px;margin:0 0 6px}
-  .city{color:#9db2ce;margin:0 0 18px}
-  .card{background:#152033;border-radius:16px;padding:14px 14px 18px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
-  .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-  .btn{background:#1b2844;color:#eaf2ff;border:1px solid #223456;border-radius:12px;padding:12px 14px;cursor:pointer}
-  .btn:disabled{opacity:.6;cursor:not-allowed}
-  .btn-primary{background:#6558ff;border-color:#7a6dff;font-weight:600;flex:1}
-  select,input[type="checkbox"]{accent-color:#6558ff}
-  select{padding:10px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:#eaf2ff;flex:1}
-  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 6px}
-  .chip{background:#1c2a43;border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:8px 12px;cursor:pointer}
-  .chip.active{background:#6558ff;border-color:#7a6dff;color:#fff}
-  .results{margin-top:14px}
-  .item{background:#0f192d;border:1px solid #203050;border-radius:12px;padding:12px;margin-top:10px}
-  .item a{color:#cfe1ff;text-decoration:none}
-  .badge{font-size:12px;opacity:.85}
-  .meta{display:flex;gap:12px;flex-wrap:wrap;margin:6px 0}
-  .row-slim{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-  .legend{margin-top:14px;font-size:14px;color:#9db2ce}
-  .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .text{flex:1;min-width:220px;padding:10px 12px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:#eaf2ff}
-  /* Auth overlay */
-  .overlay{position:fixed;inset:0;background:rgba(5,10,20,.8);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
-  .panel{background:#0f192d;border:1px solid #203050;border-radius:16px;max-width:420px;width:100%;padding:18px}
-  .panel h2{margin:0 0 12px;font-size:18px}
-  .muted{color:#9db2ce;font-size:14px;margin-top:8px}
-  .topbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
-  .pill{background:#1c2a43;border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:6px 10px;font-size:13px}
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Prospects proches – v1.3.2</title>
+  <style>
+    :root{--bg:#0f141b;--panel:#152033;--card:#0f192d;--muted:#9db2ce;--text:#eaf2ff;--accent:#6558ff;--accent2:#7a6dff}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,Segoe UI,Roboto,Ubuntu}
+    .wrap{max-width:980px;margin:28px auto;padding:0 16px}
+    .topbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .title{font-weight:800;font-size:22px;margin:0}
+    .pill{background:#1c2a43;border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:6px 10px;font-size:13px}
+    .city{color:var(--muted);margin:0 0 18px}
+    .card{background:var(--panel);border-radius:16px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+    .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .text{flex:1;min-width:160px;padding:10px 12px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:var(--text)}
+    select{padding:10px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:var(--text)}
+    .btn{background:#1b2844;color:var(--text);border:1px solid #223456;border-radius:12px;padding:11px 14px;cursor:pointer}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .btn-primary{background:var(--accent);border-color:var(--accent2);font-weight:700}
+    .results{margin-top:12px}
+    .item{background:var(--card);border:1px solid #203050;border-radius:12px;padding:12px;margin-top:10px}
+    .muted{color:var(--muted)}
+    .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .overlay{position:fixed;inset:0;background:rgba(5,10,20,.85);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
+    .panel{background:#0f192d;border:1px solid #203050;border-radius:16px;max-width:420px;width:100%;padding:18px}
+  </style>
 </head>
 <body>
 <div class="wrap">
@@ -54,23 +38,34 @@ Ajouts: Authentification e‑mail/mot de passe (signup/login/logout) via Worker 
   <div class="city">Ville : <span id="city">—</span></div>
 
   <div class="card">
-    <!-- ... tes filtres et boutons existants (inchangés) ... -->
     <div class="row">
       <button id="btnGeoloc" class="btn">📍 Me géolocaliser</button>
-      <button id="btnSearch" class="btn btn-primary">🔎 Chercher</button>
-      <button id="btnLogout" class="btn" style="margin-left:auto;display:none">🚪 Déconnexion</button>
+      <button id="btnManual" class="btn" title="Entrer ma position manuellement">✍️ Entrer ma position</button>
+      <input id="lat" class="text" placeholder="lat" style="display:none;width:140px">
+      <input id="lon" class="text" placeholder="lon" style="display:none;width:160px">
+      <button id="btnUseManual" class="btn" style="display:none">✅ Utiliser cette position</button>
+      <select id="radius">
+        <option value="3000">3 km</option>
+        <option value="5000">5 km</option>
+        <option value="10000" selected>10 km</option>
+        <option value="20000">20 km</option>
+      </select>
+      <input id="keyword" class="text" placeholder="Mot‑clé (ex: plombier)" value="plombier" />
+      <label style="display:flex;gap:6px;align-items:center"><input id="onlyOpen" type="checkbox"/> Uniquement ouverts</label>
+      <button id="btnSearch" class="btn btn-primary" style="margin-left:auto">🔎 Chercher</button>
+      <button id="btnLogout" class="btn" style="display:none">🚪 Déconnexion</button>
     </div>
-    <div id="results" class="results"></div>
-    <div class="legend">🟢 = Ouvert &nbsp; | &nbsp; 🔴 = Fermé &nbsp; | &nbsp; ⚪ = Horaires non renseignés</div>
+
+    <div id="results" class="results muted">(Résultats ici une fois connecté)</div>
   </div>
 </div>
 
 <!-- Auth overlay -->
 <div id="authOverlay" class="overlay">
   <div class="panel">
-    <h2>Connexion requise</h2>
+    <h3>Connexion requise</h3>
     <div class="row"><input id="email" class="text" type="email" placeholder="E‑mail" autocomplete="username"></div>
-    <div class="row"><input id="password" class="text" type="password" placeholder="Mot de passe" autocomplete="current-password"></div>
+    <div class="row"><input id="password" class="text" type="password" placeholder="Mot de passe (≥ 8)" autocomplete="current-password"></div>
     <div class="row">
       <button id="btnLogin" class="btn btn-primary">Se connecter</button>
       <button id="btnSignup" class="btn">Créer mon compte</button>
@@ -80,95 +75,82 @@ Ajouts: Authentification e‑mail/mot de passe (signup/login/logout) via Worker 
 </div>
 
 <script>
-const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev"; // inchangé
-const els = {
-  btnSearch: document.getElementById('btnSearch'),
-  btnGeoloc: document.getElementById('btnGeoloc'),
-  btnLogout: document.getElementById('btnLogout'),
-  results: document.getElementById('results'),
-  city: document.getElementById('city'),
-  overlay: document.getElementById('authOverlay'),
-  email: document.getElementById('email'),
-  password: document.getElementById('password'),
-  btnLogin: document.getElementById('btnLogin'),
-  btnSignup: document.getElementById('btnSignup'),
-  authMsg: document.getElementById('authMsg'),
-  authStatus: document.getElementById('authStatus'),
-};
+const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
+const $ = (id)=>document.getElementById(id);
+const ui = {city: $('city'), res: $('results'), btnGeo: $('btnGeoloc'), btnManual: $('btnManual'), lat:$('lat'), lon:$('lon'), use:$('btnUseManual'), radius:$('radius'), kw:$('keyword'), only:$('onlyOpen'), search:$('btnSearch'), logout:$('btnLogout'), overlay:$('authOverlay'), email:$('email'), pass:$('password'), login:$('btnLogin'), signup:$('btnSignup'), msg:$('authMsg'), status:$('authStatus')};
+let state = {lat:null, lon:null, authed:false, me:null};
 
-let state = {lat:null, lon:null, city:null, results:[], authed:false, me:null};
-
-function toast(msg){
-  els.authMsg.textContent = msg;
+function setOverlay(v){ ui.overlay.style.display = v?'flex':'none'; }
+function toast(t){ ui.msg.textContent = t; }
+async function api(path, opt={}){
+  const res = await fetch(WORKER_URL+path,{method:opt.method||'GET', headers:{'content-type':'application/json'}, credentials:'include', body: opt.body?JSON.stringify(opt.body):undefined});
+  if(res.status===401) throw new Error('401');
+  const j = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(j.error||res.statusText); return j;
 }
-function setOverlay(on){ els.overlay.style.display = on ? 'flex' : 'none'; }
-
-async function api(path, opts={}){
-  const res = await fetch(WORKER_URL + path, {
-    method: opts.method || 'GET',
-    headers: {'content-type':'application/json'},
-    credentials: 'include', // IMPORTANT pour cookie HttpOnly
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  const data = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.error || res.statusText);
-  return data;
-}
-
 async function checkAuth(){
+  try{ const me = await api('/auth/me'); state.authed=true; state.me=me; ui.status.textContent='Connecté: '+(me.email||''); ui.logout.style.display=''; setOverlay(false); ui.res.textContent=''; }
+  catch(_){ state.authed=false; ui.status.textContent='Non connecté'; ui.logout.style.display='none'; setOverlay(true); }
+}
+ui.login.onclick = async()=>{ try{ await api('/auth/login',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Connecté ✔'); await checkAuth(); }catch(e){ toast(e.message==='401'?'Identifiants invalides':'Erreur: '+e.message);} };
+ui.signup.onclick = async()=>{ try{ await api('/auth/signup',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Compte créé, connectez‑vous.'); }catch(e){ toast('Erreur: '+e.message);} };
+ui.logout.onclick = async()=>{ try{ await api('/auth/logout',{method:'POST'}); }catch(_){ } await checkAuth(); };
+
+// GEO auto
+ui.btnGeo.onclick = ()=>{
+  if(!state.authed) return setOverlay(true);
+  ui.city.textContent='Localisation…';
+  navigator.geolocation.getCurrentPosition(async(pos)=>{
+    state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+    try{ const g=await api(`/geocode?lat=${state.lat}&lon=${state.lon}`); const city = (g?.results?.[0]?.address_components||[]).find(c=>c.types.includes('locality'))?.long_name || g?.results?.[0]?.formatted_address || '—'; ui.city.textContent=city; }
+    catch(e){ ui.city.textContent='—'; }
+  },(err)=>{
+    ui.city.textContent='—'; alert('Géolocalisation refusée ou indisponible. Utilise "Entrer ma position".');
+    // Ouvre auto la saisie manuelle
+    ui.btnManual.click();
+  },{enableHighAccuracy:true,timeout:10000});
+};
+
+// GEO manuelle
+ui.btnManual.onclick = ()=>{ ui.lat.style.display=ui.lon.style.display=ui.use.style.display=''; ui.lat.focus(); };
+ui.use.onclick = async()=>{
+  const lat=parseFloat(ui.lat.value.replace(',','.')); const lon=parseFloat(ui.lon.value.replace(',','.'));
+  if(Number.isFinite(lat)&&Number.isFinite(lon)){ state.lat=lat; state.lon=lon; try{ const g=await api(`/geocode?lat=${lat}&lon=${lon}`); const city=g?.results?.[0]?.formatted_address||'—'; ui.city.textContent=city; }catch(_){ ui.city.textContent='—'; } }
+  else alert('Coordonnées invalides');
+};
+
+// SEARCH
+ui.search.onclick = async()=>{
+  if(!state.authed) return setOverlay(true);
+  if(!state.lat||!state.lon) return alert('Définis ta position (géoloc ou manuelle).');
+  ui.res.innerHTML='<span class="spinner"></span> Recherche en cours…';
   try{
-    const me = await api('/auth/me');
-    state.authed = true; state.me = me;
-    els.authStatus.textContent = 'Connecté: ' + (me.email || '');
-    els.btnLogout.style.display = '';
-    setOverlay(false);
-  }catch(e){
-    state.authed = false; state.me = null;
-    els.authStatus.textContent = 'Non connecté';
-    els.btnLogout.style.display = 'none';
-    setOverlay(true);
-  }
-}
-
-els.btnLogin.onclick = async()=>{
-  try{ await api('/auth/login',{method:'POST', body:{email:els.email.value.trim(), password:els.password.value}}); toast('Connecté ✔'); await checkAuth(); }
-  catch(e){ toast('Erreur: ' + e.message); }
-};
-els.btnSignup.onclick = async()=>{
-  try{ await api('/auth/signup',{method:'POST', body:{email:els.email.value.trim(), password:els.password.value}}); toast('Compte créé, vous pouvez vous connecter.'); }
-  catch(e){ toast('Erreur: ' + e.message); }
-};
-els.btnLogout.onclick = async()=>{
-  try{ await api('/auth/logout',{method:'POST'}); toast('Déconnecté.'); }catch(_){}
-  await checkAuth();
+    const url = new URL(WORKER_URL+'/nearby');
+    url.searchParams.set('lat',state.lat); url.searchParams.set('lon',state.lon);
+    url.searchParams.set('radius',ui.radius.value); url.searchParams.set('keyword',(ui.kw.value||'plombier').trim());
+    if(ui.only.checked) url.searchParams.set('opennow','true');
+    const data = await fetch(url,{credentials:'include'}).then(r=>r.json());
+    const items = data?.results||[]; if(!items.length){ ui.res.textContent='Aucun résultat.'; return; }
+    ui.res.innerHTML = items.map(r=>{
+      const name=r.name||'—'; const addr=r.vicinity||r.formatted_address||''; const open=r.opening_hours?.open_now; const badge=open===true?'🟢 Ouvert':(open===false?'🔴 Fermé':'⚪ Horaires ?');
+      return `<div class="item"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap"><div><div style="font-weight:700">${name}</div><div class="muted">${badge}</div><div>${addr}</div></div><div style="display:flex;gap:8px"><button class="btn" onclick='openMaps(${JSON.stringify({name,addr,lat:r.geometry?.location?.lat,lon:r.geometry?.location?.lng,place_id:r.place_id})})'>🗺️ Maps</button><button class="btn" onclick='showDetails("${r.place_id}")'>ℹ️ Infos</button></div></div><div class="muted" id="d_${r.place_id}"></div></div>`;
+    }).join('');
+  }catch(e){ if(String(e).includes('401')) setOverlay(true); else ui.res.textContent='Erreur: '+e.message; }
 };
 
-// --- Géoloc / Recherche (placeholders: réintègre ton code existant ici) ---
-function isAndroid(){ return /Android/i.test(navigator.userAgent); }
-function isStandalone(){
-  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
-         || window.navigator.standalone === true;
-}
-function openMaps({name, addr, lat, lon, place_id}){
-  const label = name || addr || '';
-  if(isAndroid() && isStandalone() && lat && lon){
-    const geo = `geo:${lat},${lon}?q=${encodeURIComponent(label)}@${lat},${lon}`;
-    window.location.href = geo; return;
-  }
-  let url='';
-  if(place_id){ url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}&query_place_id=${encodeURIComponent(place_id)}`; }
-  else if(lat&&lon){ url=`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`; }
-  else{ url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`; }
-  window.open(url,'_blank','noopener,noreferrer');
-}
+window.openMaps = ({name,addr,lat,lon,place_id})=>{
+  const label=name||addr||''; let url='';
+  if(place_id) url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}&query_place_id=${encodeURIComponent(place_id)}`;
+  else if(lat&&lon) url=`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+  else url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`;
+  window.open(url,'_blank','noopener');
+};
+window.showDetails = async (place_id)=>{
+  const box=document.getElementById('d_'+place_id); if(!box) return; box.textContent='Chargement…';
+  try{ const j=await fetch(WORKER_URL+`/details?place_id=${place_id}`,{credentials:'include'}).then(r=>r.json()); const res=j.result||{}; const tel=res.formatted_phone_number||res.international_phone_number||''; const web=res.website||res.url||''; const telHref=(tel||'').replace(/\s/g,''); box.innerHTML=[tel?`☎️ <a href="tel:${telHref}">${tel}</a>`:'', web?`🌐 <a href="${web}" target="_blank">Site</a>`:''].filter(Boolean).join(' · ') || 'Aucune info.'; }
+  catch(_){ box.textContent='Erreur.'; }
+};
 
-els.btnSearch.addEventListener('click', async()=>{
-  if(!state.authed){ setOverlay(true); return; }
-  // ... ici réutilise TA logique de recherche existante (appel Worker /nearby, rendu des résultats, etc.)
-  els.results.innerHTML = '<div class="muted">(Résultats ici une fois connecté)</div>';
-});
-
-// Lancer l’app
 checkAuth();
 </script>
 </body>
