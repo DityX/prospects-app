@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Prospects proches</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#6558ff">
 <style>
   body{margin:0;background:#0f141b;color:#eaf2ff;font:16px/1.4 system-ui}
   .wrap{max-width:880px;margin:32px auto;padding:0 16px}
@@ -360,6 +362,15 @@ els.btnResetApp.addEventListener('click', async ()=>{
 
 // Charger préférences au démarrage
 loadPrefs();
+
+// ---------- Enregistrer le service worker (PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.log('SW register failed', e));
+  });
+}
 </script>
 </body>
 </html>
