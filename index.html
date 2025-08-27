@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Prospects proches – v1.3.2</title>
+  <title>Prospects proches – v1.3.3</title>
   <style>
     :root{--bg:#0f141b;--panel:#152033;--card:#0f192d;--muted:#9db2ce;--text:#eaf2ff;--accent:#6558ff;--accent2:#7a6dff}
     *{box-sizing:border-box}
@@ -68,7 +68,8 @@
     <div class="row"><input id="password" class="text" type="password" placeholder="Mot de passe (≥ 8)" autocomplete="current-password"></div>
     <div class="row">
       <button id="btnLogin" class="btn btn-primary">Se connecter</button>
-      <button id="btnSignup" class="btn">Créer mon compte</button>
+      <!-- Bouton créer un compte masqué pour la phase de test -->
+      <button id="btnSignup" class="btn" style="display:none">Créer mon compte</button>
     </div>
     <div id="authMsg" class="muted"></div>
   </div>
@@ -93,7 +94,7 @@ async function checkAuth(){
   catch(_){ state.authed=false; ui.status.textContent='Non connecté'; ui.logout.style.display='none'; setOverlay(true); }
 }
 ui.login.onclick = async()=>{ try{ await api('/auth/login',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Connecté ✔'); await checkAuth(); }catch(e){ toast(e.message==='401'?'Identifiants invalides':'Erreur: '+e.message);} };
-ui.signup.onclick = async()=>{ try{ await api('/auth/signup',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Compte créé, connectez‑vous.'); }catch(e){ toast('Erreur: '+e.message);} };
+// signup caché volontairement en phase de test
 ui.logout.onclick = async()=>{ try{ await api('/auth/logout',{method:'POST'}); }catch(_){ } await checkAuth(); };
 
 // GEO auto
@@ -106,7 +107,6 @@ ui.btnGeo.onclick = ()=>{
     catch(e){ ui.city.textContent='—'; }
   },(err)=>{
     ui.city.textContent='—'; alert('Géolocalisation refusée ou indisponible. Utilise "Entrer ma position".');
-    // Ouvre auto la saisie manuelle
     ui.btnManual.click();
   },{enableHighAccuracy:true,timeout:10000});
 };
