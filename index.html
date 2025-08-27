@@ -83,7 +83,6 @@
 
 <script>
 const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
-const PAGES = 2;
 
 const els = {
   city: document.getElementById('city'),
@@ -168,7 +167,9 @@ els.btnSearch.addEventListener('click', async()=>{
         </div>
         <div class="row-slim">
           <a class="btn" target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Maps</a>
+          <button class="btn" onclick="showDetails('${p.place_id}','det-${i}')">📞 Coordonnées</button>
         </div>
+        <div class="badge" id="det-${i}" style="margin-top:6px;display:none"></div>
       </div>
     `).join("");
   }catch(e){
@@ -177,6 +178,23 @@ els.btnSearch.addEventListener('click', async()=>{
     setSearching(false);
   }
 });
+
+// détails (téléphone + site)
+async function showDetails(placeId,detId){
+  const el=document.getElementById(detId);
+  if(el.style.display==="block"){ el.style.display="none"; return; }
+  el.style.display="block"; el.textContent="Chargement…";
+  try{
+    const r=await fetch(`${WORKER_URL}/details?place_id=${encodeURIComponent(placeId)}`);
+    const j=await r.json();
+    const d=j.result||{};
+    const tel=d.formatted_phone_number||d.international_phone_number||"—";
+    const web=d.website?`<a target="_blank" href="${d.website}">${d.website}</a>`:"—";
+    el.innerHTML=`☎️ ${tel} &nbsp; • &nbsp; 🌐 ${web}`;
+  }catch{
+    el.textContent="Impossible de récupérer les coordonnées.";
+  }
+}
 </script>
 </body>
 </html>
