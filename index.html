@@ -28,6 +28,7 @@
   .legend{margin-top:14px;font-size:14px;color:#9db2ce}
   .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .text{flex:1;min-width:220px;padding:10px 12px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:#eaf2ff}
 </style>
 </head>
 <body>
@@ -36,7 +37,9 @@
   <div class="city">Ville : <span id="city">—</span></div>
 
   <div class="card">
-    <div class="row"><button id="btnGeo" class="btn" style="width:100%">📍 Me géolocaliser</button></div>
+    <div class="row">
+      <button id="btnGeo" class="btn" style="width:100%">📍 Me géolocaliser</button>
+    </div>
 
     <div class="row">
       <select id="radius">
@@ -64,8 +67,23 @@
         <input type="checkbox" id="openNow" />
         Uniquement les pros ouverts actuellement
       </label>
+
+      <!-- NEW: inclure horaires non renseignés -->
+      <label style="display:flex;align-items:center;gap:8px;opacity:.9">
+        <input type="checkbox" id="includeUnknown" disabled />
+        Inclure horaires non renseignés
+      </label>
+
       <button id="btnExport" class="btn">⬇️ Export CSV</button>
       <button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button>
+    </div>
+
+    <!-- NEW: mot-clé libre -->
+    <div class="row">
+      <input id="freeKw" class="text" placeholder="Mot-clé libre (ex. VMC, photovoltaïque, salle de bain…)" />
+      <button id="btnAddKw" class="btn">➕ Ajouter au filtre</button>
+      <!-- NEW: reset app -->
+      <button id="btnResetApp" class="btn" title="Purger caches + service worker">🧹 Réinitialiser l’appli</button>
     </div>
 
     <div id="cats" class="chips">
@@ -89,10 +107,14 @@ const els = {
   btnGeo: document.getElementById('btnGeo'),
   btnSearch: document.getElementById('btnSearch'),
   btnExport: document.getElementById('btnExport'),
+  btnAddKw: document.getElementById('btnAddKw'),
+  btnResetApp: document.getElementById('btnResetApp'),
   radius: document.getElementById('radius'),
   limit: document.getElementById('limit'),
   sort: document.getElementById('sort'),
   openNow: document.getElementById('openNow'),
+  includeUnknown: document.getElementById('includeUnknown'),
+  freeKw: document.getElementById('freeKw'),
   cats: document.getElementById('cats'),
   results: document.getElementById('results'),
 };
@@ -116,7 +138,8 @@ function savePrefs(){
     radius: els.radius.value,
     limit: els.limit.value,
     sort: els.sort.value,
-    open: els.openNow.checked
+    open: els.openNow.checked,
+    includeUnknown: els.includeUnknown.checked
   };
   localStorage.setItem('prefs_v1', JSON.stringify(data));
 }
@@ -127,19 +150,38 @@ function loadPrefs(){
     if(j.limit) els.limit.value = j.limit;
     if(j.sort) els.sort.value = j.sort;
     if(typeof j.open === 'boolean') els.openNow.checked = j.open;
+    if(typeof j.includeUnknown === 'boolean') els.includeUnknown.checked = j.includeUnknown;
+    els.includeUnknown.disabled = !els.openNow.checked;
   }catch{}
 }
 ['change','click'].forEach(ev=>{
   els.radius.addEventListener(ev, savePrefs);
   els.limit.addEventListener(ev, savePrefs);
   els.sort.addEventListener(ev, savePrefs);
-  els.openNow.addEventListener(ev, savePrefs);
+  els.openNow.addEventListener(ev, ()=>{
+    els.includeUnknown.disabled = !els.openNow.checked;
+    if(!els.openNow.checked){ els.includeUnknown.checked = false; }
+    savePrefs();
+  });
+  els.includeUnknown.addEventListener(ev, savePrefs);
 });
 
 // ---------- Chips (catégories) ----------
 els.cats.addEventListener('click', e=>{
   const c=e.target.closest('.chip'); if(!c) return;
   c.classList.toggle('active');
+});
+
+// ---------- Ajouter mot-clé libre ----------
+els.btnAddKw.addEventListener('click', ()=>{
+  const val = (els.freeKw.value||'').trim();
+  if(!val) return;
+  const chip = document.createElement('div');
+  chip.className = 'chip active';
+  chip.dataset.key = val;
+  chip.textContent = val;
+  els.cats.appendChild(chip);
+  els.freeKw.value = '';
 });
 
 // ---------- Géolocalisation ----------
@@ -175,6 +217,8 @@ els.btnSearch.addEventListener('click', async()=>{
   const limit  = parseInt(els.limit.value,10);
   const sort   = els.sort.value;
   const openNow = els.openNow.checked;
+  const includeUnknown = els.includeUnknown.checked;
+
   const kws = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
   if(kws.length===0){ toast("Sélectionne au moins une catégorie."); return; }
 
@@ -188,7 +232,7 @@ els.btnSearch.addEventListener('click', async()=>{
         radius: String(radius),
         keyword: kw
       });
-      if(openNow) params.set('opennow','1'); // envoie seulement si demandé
+      if(openNow) params.set('opennow','1'); // envoyé seulement si demandé
 
       const r = await fetch(`${WORKER_URL}/nearby?${params.toString()}`);
       const j = await r.json();
@@ -207,6 +251,11 @@ els.btnSearch.addEventListener('click', async()=>{
       }
     }
 
+    // ---- Filtre local "Ouverts maintenant" (fix) ----
+    if(openNow){
+      all = all.filter(r => r.status === 'open' || (includeUnknown && r.status === 'unknown'));
+    }
+
     // Dédup par place_id + fusion des catégories + meilleure adresse
     const map = new Map();
     for(const row of all){
@@ -215,11 +264,9 @@ els.btnSearch.addEventListener('click', async()=>{
         map.set(row.place_id, {...row, cats:new Set([row.kw])});
       }else{
         prev.cats.add(row.kw);
-        // si adresse plus “riche”
         if((row.addr||'').length > (prev.addr||'').length){ prev.addr = row.addr; }
-        // garder le statut "open" si l'un des doublons est open
         if(row.status === 'open' || prev.status === 'open'){
-          prev.status = (row.status === 'open' || prev.status === 'open') ? 'open' : prev.status;
+          prev.status = 'open';
         }
       }
     }
@@ -289,6 +336,26 @@ els.btnExport.addEventListener('click', ()=>{
   const blob = new Blob([header+body], {type:"text/csv;charset=utf-8"});
   const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: "prospects.csv"});
   a.click(); URL.revokeObjectURL(a.href);
+});
+
+// ---------- Réinitialiser l’appli (cache + service worker)
+els.btnResetApp.addEventListener('click', async ()=>{
+  if(!confirm("Purger le cache, les données et le service worker ?")) return;
+  try{
+    if('caches' in window){
+      const names = await caches.keys();
+      await Promise.all(names.map(n => caches.delete(n)));
+    }
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    localStorage.clear(); sessionStorage.clear();
+    alert("OK. Recharge l’app.");
+    location.reload();
+  }catch(e){
+    alert("Impossible de purger : " + e.message);
+  }
 });
 
 // Charger préférences au démarrage
