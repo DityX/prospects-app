@@ -74,10 +74,10 @@ function setSearching(on){
 }
 function toast(msg){ els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>`; }
 function distKm(a,b,c,d){
-  const R=6371,toRad=x=>x*Math.PI/180;
-  const dLat=toRad(c-a), dLon=toRad(d-b);
-  const x=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*mathsin(dLon/2)**2;
-  return 2*R*Math.asin(Math.sqrt(x));
+  const R = 6371, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(c - a), dLon = toRad(d - b);
+  const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a)) * Math.cos(toRad(c)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(x));
 }
 
 // reverse geocode via Worker
