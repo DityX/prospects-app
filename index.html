@@ -44,9 +44,9 @@
       </select>
     </div>
     <div id="cats" class="chips">
-      <div class="chip active" data-key="plumber">Sanitaire</div>
-      <div class="chip active" data-key="heating">Chauffage</div>
-      <div class="chip active" data-key="clim">Climatisation / ENR</div>
+      <div class="chip active" data-key="plombier">Sanitaire</div>
+      <div class="chip active" data-key="chauffagiste">Chauffage</div>
+      <div class="chip active" data-key="climatisation pompe à chaleur">Climatisation / ENR</div>
     </div>
     <div class="row"><button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button></div>
     <div id="results" class="results"></div>
@@ -54,7 +54,7 @@
 </div>
 
 <script>
-const API_KEY = "AIzaSyA5pkwLj7tBm8rCfyjLuhyw1mgP_LIxuMs";  // 🔑 Ta clé
+const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev"; // ton proxy Cloudflare
 
 const els = {
   city: document.getElementById('city'),
@@ -79,11 +79,11 @@ function distKm(a,b,c,d){
   return 2*R*Math.asin(Math.sqrt(x));
 }
 
-// reverse geocode via Google
+// reverse geocode via ton Worker
 async function reverseGeocode(lat, lon){
-  const url=`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${API_KEY}&language=fr`;
-  const r=await fetch(url);const j=await r.json();
-  return j.results[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name||"—";
+  const r=await fetch(`${WORKER_URL}/geocode?lat=${lat}&lon=${lon}`);
+  const j=await r.json();
+  return j.results?.[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name||"—";
 }
 
 // chips
@@ -102,7 +102,7 @@ els.btnGeo.addEventListener('click',()=>{
   },()=>toast("Impossible d'obtenir la position."));
 });
 
-// recherche Google Places
+// recherche
 els.btnSearch.addEventListener('click',async()=>{
   if(!(state.lat&&state.lon)){toast("Clique d’abord sur Me géolocaliser.");return;}
   const radius=parseInt(els.radius.value,10);
@@ -112,12 +112,9 @@ els.btnSearch.addEventListener('click',async()=>{
   setSearching(true);
   try{
     let results=[];
-    for(const cat of cats){
-      let keyword = "plombier";
-      if(cat==="heating") keyword="chauffagiste";
-      if(cat==="clim") keyword="climatisation pompe à chaleur";
-      const url=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${state.lat},${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=${API_KEY}&language=fr`;
-      const r=await fetch(url);const j=await r.json();
+    for(const keyword of cats){
+      const r=await fetch(`${WORKER_URL}/nearby?lat=${state.lat}&lon=${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}`);
+      const j=await r.json();
       for(const p of (j.results||[])){
         const d=distKm(state.lat,state.lon,p.geometry.location.lat,p.geometry.location.lng);
         results.push({
@@ -142,7 +139,7 @@ els.btnSearch.addEventListener('click',async()=>{
           <div style="margin-top:6px"><a target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Ouvrir dans Google Maps</a></div>
         </div>`).join("");
     }
-  }catch(e){toast("Erreur API Google.");}
+  }catch(e){toast("Erreur API Worker.");}
   finally{setSearching(false);}
 });
 </script>
