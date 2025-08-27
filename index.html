@@ -54,6 +54,8 @@
 </div>
 
 <script>
+const API_KEY = "AIzaSyA5pkwLj7tBm8rCfyjLuhyw1mgP_LIxuMs";  // 🔑 Ta clé
+
 const els = {
   city: document.getElementById('city'),
   btnGeo: document.getElementById('btnGeo'),
@@ -70,7 +72,6 @@ function setSearching(on){
   els.btnSearch.innerHTML = on ? '<span class="spinner"></span>Recherche en cours…' : '🔎 Trouver des prospects';
 }
 function toast(msg){ els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>`; }
-
 function distKm(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a), dLon=toRad(d-b);
@@ -80,7 +81,7 @@ function distKm(a,b,c,d){
 
 // reverse geocode via Google
 async function reverseGeocode(lat, lon){
-  const url=`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=AIzaSyCqX2AhKJ2wGgmegOFa-txu1oiB0Tjpvi4&language=fr`;
+  const url=`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${API_KEY}&language=fr`;
   const r=await fetch(url);const j=await r.json();
   return j.results[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name||"—";
 }
@@ -115,7 +116,7 @@ els.btnSearch.addEventListener('click',async()=>{
       let keyword = "plombier";
       if(cat==="heating") keyword="chauffagiste";
       if(cat==="clim") keyword="climatisation pompe à chaleur";
-      const url=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${state.lat},${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=AIzaSyCqX2AhKJ2wGgmegOFa-txu1oiB0Tjpvi4&language=fr`;
+      const url=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${state.lat},${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=${API_KEY}&language=fr`;
       const r=await fetch(url);const j=await r.json();
       for(const p of (j.results||[])){
         const d=distKm(state.lat,state.lon,p.geometry.location.lat,p.geometry.location.lng);
@@ -129,8 +130,7 @@ els.btnSearch.addEventListener('click',async()=>{
         });
       }
     }
-    results=results.sort((a,b)=>a.dist-b.dist);
-    results=results.slice(0,limit);
+    results=results.sort((a,b)=>a.dist-b.dist).slice(0,limit);
 
     if(!results.length){toast("Aucun résultat trouvé.");}
     else{
