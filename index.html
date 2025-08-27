@@ -54,7 +54,8 @@
 </div>
 
 <script>
-const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev"; // ton proxy Cloudflare
+// ⬇️ TON WORKER CLOUDFLARE (garde exactement cette URL)
+const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
 
 const els = {
   city: document.getElementById('city'),
@@ -75,72 +76,78 @@ function toast(msg){ els.results.innerHTML = `<div class="item"><strong>${msg}</
 function distKm(a,b,c,d){
   const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a), dLon=toRad(d-b);
-  const x=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;
+  const x=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*mathsin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(x));
 }
 
-// reverse geocode via ton Worker
+// reverse geocode via Worker
 async function reverseGeocode(lat, lon){
-  const r=await fetch(`${WORKER_URL}/geocode?lat=${lat}&lon=${lon}`);
-  const j=await r.json();
-  return j.results?.[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name||"—";
+  const r = await fetch(`${WORKER_URL}/geocode?lat=${lat}&lon=${lon}`);
+  const j = await r.json();
+  return j.results?.[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name || "—";
 }
 
-// chips
+// chips on/off
 els.cats.addEventListener('click', e=>{
-  const c=e.target.closest('.chip');if(!c)return;
+  const c=e.target.closest('.chip'); if(!c) return;
   c.classList.toggle('active');
 });
 
-// géoloc
-els.btnGeo.addEventListener('click',()=>{
+// géolocalisation
+els.btnGeo.addEventListener('click', ()=>{
   navigator.geolocation.getCurrentPosition(async pos=>{
-    state.lat=pos.coords.latitude;state.lon=pos.coords.longitude;
-    state.city=await reverseGeocode(state.lat,state.lon);
-    els.city.textContent=state.city;
+    state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+    state.city = await reverseGeocode(state.lat, state.lon);
+    els.city.textContent = state.city;
     toast("Position enregistrée ✅");
-  },()=>toast("Impossible d'obtenir la position."));
+  }, ()=> toast("Impossible d'obtenir la position (autorisation ?)"));
 });
 
 // recherche
-els.btnSearch.addEventListener('click',async()=>{
-  if(!(state.lat&&state.lon)){toast("Clique d’abord sur Me géolocaliser.");return;}
-  const radius=parseInt(els.radius.value,10);
-  const limit=parseInt(els.limit.value,10);
-  const cats=[...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
+els.btnSearch.addEventListener('click', async()=>{
+  if(!(state.lat&&state.lon)){ toast("Clique d’abord sur Me géolocaliser."); return; }
+  const radius = parseInt(els.radius.value,10);
+  const limit  = parseInt(els.limit.value,10);
+  const cats   = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
 
   setSearching(true);
   try{
     let results=[];
     for(const keyword of cats){
-      const r=await fetch(`${WORKER_URL}/nearby?lat=${state.lat}&lon=${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}`);
-      const j=await r.json();
+      const r = await fetch(`${WORKER_URL}/nearby?lat=${state.lat}&lon=${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}`);
+      const j = await r.json();
       for(const p of (j.results||[])){
-        const d=distKm(state.lat,state.lon,p.geometry.location.lat,p.geometry.location.lng);
+        const lat=p.geometry.location.lat, lon=p.geometry.location.lng;
         results.push({
           name:p.name,
           addr:p.vicinity,
-          lat:p.geometry.location.lat,
-          lon:p.geometry.location.lng,
+          lat, lon,
           categoryLabel:keyword,
-          dist:d
+          dist: distKm(state.lat,state.lon,lat,lon)
         });
       }
     }
-    results=results.sort((a,b)=>a.dist-b.dist).slice(0,limit);
+    results = results.sort((a,b)=>a.dist-b.dist).slice(0, limit);
 
-    if(!results.length){toast("Aucun résultat trouvé.");}
+    if(!results.length){ toast("Aucun résultat trouvé."); }
     else{
-      els.results.innerHTML=results.map(p=>`
+      els.results.innerHTML = results.map(p=>`
         <div class="item">
           <div><strong>${p.name}</strong></div>
           <div class="badge">${p.categoryLabel} · ${p.dist.toFixed(1)} km</div>
           <div class="badge">${p.addr||""}</div>
-          <div style="margin-top:6px"><a target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Ouvrir dans Google Maps</a></div>
-        </div>`).join("");
+          <div style="margin-top:6px">
+            <a target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">
+              ➡️ Ouvrir dans Google Maps
+            </a>
+          </div>
+        </div>`).join('');
     }
-  }catch(e){toast("Erreur API Worker.");}
-  finally{setSearching(false);}
+  }catch(e){
+    toast("Erreur (proxy/Google).");
+  }finally{
+    setSearching(false);
+  }
 });
 </script>
 </body>
