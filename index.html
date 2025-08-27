@@ -96,8 +96,10 @@ const els = {
   cats: document.getElementById('cats'),
   results: document.getElementById('results'),
 };
+
 let state = {lat:null, lon:null, city:null, results:[]};
 
+// ---------- Helpers ----------
 function setSearching(on){
   els.btnSearch.disabled = on;
   els.btnSearch.innerHTML = on ? '<span class="spinner"></span>Recherche en cours…' : '🔎 Trouver des prospects';
@@ -109,56 +111,132 @@ function distKm(a,b,c,d){
   const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a)) * Math.cos(toRad(c)) * Math.sin(dLon/2)**2;
   return 2 * R * Math.asin(Math.sqrt(x));
 }
+function savePrefs(){
+  const data = {
+    radius: els.radius.value,
+    limit: els.limit.value,
+    sort: els.sort.value,
+    open: els.openNow.checked
+  };
+  localStorage.setItem('prefs_v1', JSON.stringify(data));
+}
+function loadPrefs(){
+  try{
+    const j = JSON.parse(localStorage.getItem('prefs_v1')||'{}');
+    if(j.radius) els.radius.value = j.radius;
+    if(j.limit) els.limit.value = j.limit;
+    if(j.sort) els.sort.value = j.sort;
+    if(typeof j.open === 'boolean') els.openNow.checked = j.open;
+  }catch{}
+}
+['change','click'].forEach(ev=>{
+  els.radius.addEventListener(ev, savePrefs);
+  els.limit.addEventListener(ev, savePrefs);
+  els.sort.addEventListener(ev, savePrefs);
+  els.openNow.addEventListener(ev, savePrefs);
+});
 
-// chips
+// ---------- Chips (catégories) ----------
 els.cats.addEventListener('click', e=>{
   const c=e.target.closest('.chip'); if(!c) return;
   c.classList.toggle('active');
 });
 
-// géoloc
-els.btnGeo.addEventListener('click',()=>{
+// ---------- Géolocalisation ----------
+els.btnGeo.addEventListener('click', async ()=>{
+  if(!('geolocation' in navigator)){
+    toast("Géoloc indisponible sur ce navigateur.");
+    return;
+  }
   navigator.geolocation.getCurrentPosition(async pos=>{
     state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
-    const r = await fetch(`${WORKER_URL}/geocode?lat=${state.lat}&lon=${state.lon}`);
-    const j = await r.json();
-    state.city = j.results?.[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name || "—";
-    els.city.textContent = state.city;
-    toast("Position enregistrée ✅");
-  },()=>toast("Impossible d'obtenir la position (autorisation ?)"));
+    try{
+      const r = await fetch(`${WORKER_URL}/geocode?lat=${state.lat}&lon=${state.lon}`);
+      const j = await r.json();
+      state.city = j.results?.[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name
+                || j.results?.[0]?.formatted_address
+                || "—";
+      els.city.textContent = state.city;
+      toast("Position enregistrée ✅");
+    }catch{
+      els.city.textContent = "—";
+      toast("Position enregistrée ✅ (reverse geocode indisponible)");
+    }
+  }, err=>{
+    toast("Impossible d'obtenir la position (permission refusée ?)");
+  }, {enableHighAccuracy:true, timeout:12000, maximumAge:0});
 });
 
-// recherche
+// ---------- Recherche ----------
 els.btnSearch.addEventListener('click', async()=>{
   if(!(state.lat&&state.lon)){ toast("Clique d’abord sur Me géolocaliser."); return; }
+
   const radius = parseInt(els.radius.value,10);
   const limit  = parseInt(els.limit.value,10);
   const sort   = els.sort.value;
   const openNow = els.openNow.checked;
   const kws = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
+  if(kws.length===0){ toast("Sélectionne au moins une catégorie."); return; }
 
   setSearching(true);
   try{
-    let rows = [];
+    let all = [];
     for(const kw of kws){
-      const url = `${WORKER_URL}/nearby?lat=${state.lat}&lon=${state.lon}&radius=${radius}&keyword=${encodeURIComponent(kw)}&opennow=${openNow}`;
-      const r = await fetch(url);
+      const params = new URLSearchParams({
+        lat: String(state.lat),
+        lon: String(state.lon),
+        radius: String(radius),
+        keyword: kw
+      });
+      if(openNow) params.set('opennow','1'); // envoie seulement si demandé
+
+      const r = await fetch(`${WORKER_URL}/nearby?${params.toString()}`);
       const j = await r.json();
+
       for(const p of (j.results||[])){
-        const lat=p.geometry.location.lat, lon=p.geometry.location.lng;
+        const lat=p.geometry?.location?.lat, lon=p.geometry?.location?.lng;
         const status = p.opening_hours ? (p.opening_hours.open_now ? "open" : "closed") : "unknown";
-        rows.push({
-          place_id:p.place_id, name:p.name, addr:p.vicinity||"",
-          lat, lon, kw, dist: distKm(state.lat,state.lon,lat,lon), status
+        all.push({
+          place_id:p.place_id,
+          name:p.name,
+          addr:p.vicinity||p.formatted_address||"",
+          lat, lon, kw,
+          dist: distKm(state.lat,state.lon,lat,lon),
+          status
         });
       }
     }
-    rows = rows.sort((a,b)=> (sort==="name" ? a.name.localeCompare(b.name) : a.dist-b.dist)).slice(0, limit);
+
+    // Dédup par place_id + fusion des catégories + meilleure adresse
+    const map = new Map();
+    for(const row of all){
+      const prev = map.get(row.place_id);
+      if(!prev){
+        map.set(row.place_id, {...row, cats:new Set([row.kw])});
+      }else{
+        prev.cats.add(row.kw);
+        // si adresse plus “riche”
+        if((row.addr||'').length > (prev.addr||'').length){ prev.addr = row.addr; }
+        // garder le statut "open" si l'un des doublons est open
+        if(row.status === 'open' || prev.status === 'open'){
+          prev.status = (row.status === 'open' || prev.status === 'open') ? 'open' : prev.status;
+        }
+      }
+    }
+
+    let rows = [...map.values()].map(r=>({ ...r, kw: [...r.cats].join(' · ')}));
+
+    // Tri global
+    rows.sort((a,b)=> (sort==="name" ? a.name.localeCompare(b.name) : a.dist-b.dist));
+
+    // Limite finale
+    rows = rows.slice(0, limit);
     state.results = rows;
 
     if(!rows.length){ toast("Aucun résultat trouvé."); return; }
+
     els.results.innerHTML = rows.map((p,i)=>`
-      <div class="item">
+      <div class="item" data-name="${p.name}" data-addr="${p.addr}" data-cats="${p.kw}" data-dist="${p.dist.toFixed(2)}">
         <div><strong>${p.name}</strong></div>
         <div class="meta">
           <span>${p.status==="open"?"🟢 Ouvert":p.status==="closed"?"🔴 Fermé":"⚪ Horaires non renseignés"}</span>
@@ -166,20 +244,22 @@ els.btnSearch.addEventListener('click', async()=>{
           <span class="badge">${p.addr}</span>
         </div>
         <div class="row-slim">
-          <a class="btn" target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Maps</a>
+          <a class="btn" target="_blank" href="https://www.google.com/maps/place/?q=place_id:${encodeURIComponent(p.place_id)}">➡️ Maps</a>
           <button class="btn" onclick="showDetails('${p.place_id}','det-${i}')">📞 Coordonnées</button>
         </div>
         <div class="badge" id="det-${i}" style="margin-top:6px;display:none"></div>
       </div>
     `).join("");
+
   }catch(e){
+    console.warn(e);
     toast("Erreur (proxy/Google).");
   }finally{
     setSearching(false);
   }
 });
 
-// détails (téléphone + site)
+// ---------- Détails (téléphone + site)
 async function showDetails(placeId,detId){
   const el=document.getElementById(detId);
   if(el.style.display==="block"){ el.style.display="none"; return; }
@@ -190,24 +270,29 @@ async function showDetails(placeId,detId){
     const d=j.result||{};
     const tel=d.formatted_phone_number||d.international_phone_number||"—";
     const web=d.website?`<a target="_blank" href="${d.website}">${d.website}</a>`:"—";
-    el.innerHTML=`☎️ ${tel} &nbsp; • &nbsp; 🌐 ${web}`;
+    const telLink = tel && tel!=="—" ? `<a href="tel:${tel.replaceAll(' ','')}">${tel}</a>` : "—";
+    el.innerHTML=`☎️ ${telLink} &nbsp; • &nbsp; 🌐 ${web}`;
   }catch{
     el.textContent="Impossible de récupérer les coordonnées.";
   }
 }
 
-// export CSV
+// ---------- Export CSV (résultats visibles)
 els.btnExport.addEventListener('click', ()=>{
   const rows = state.results||[];
   if(!rows.length){ toast("Rien à exporter (lance une recherche)."); return; }
-  const header = "Nom;Adresse;Catégorie;Distance (km);Latitude;Longitude\n";
+  const header = "Nom;Adresse;Catégories;Distance (km);Latitude;Longitude;PlaceID\n";
   const body = rows.map(r=>[
-    r.name.replace(/;/g,","), r.addr.replace(/;/g,","), r.kw, r.dist.toFixed(2), r.lat, r.lon
+    r.name.replace(/;/g,","), (r.addr||"").replace(/;/g,","), r.kw,
+    r.dist.toFixed(2), r.lat, r.lon, r.place_id
   ].join(";")).join("\n");
   const blob = new Blob([header+body], {type:"text/csv;charset=utf-8"});
   const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: "prospects.csv"});
   a.click(); URL.revokeObjectURL(a.href);
 });
+
+// Charger préférences au démarrage
+loadPrefs();
 </script>
 </body>
 </html>
