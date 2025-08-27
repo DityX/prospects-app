@@ -39,7 +39,58 @@
   <div class="city">Ville : <span id="city">—</span></div>
 
   <div class="card">
-    <!-- ... tes filtres et boutons inchangés ... -->
+    <div class="row">
+      <button id="btnGeo" class="btn" style="width:100%">📍 Me géolocaliser</button>
+    </div>
+
+    <div class="row">
+      <select id="radius">
+        <option value="5000">5 km</option>
+        <option value="10000">10 km</option>
+        <option value="20000" selected>20 km</option>
+        <option value="30000">30 km</option>
+      </select>
+
+      <select id="limit">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="20">20</option>
+        <option value="40">40</option>
+      </select>
+
+      <select id="sort">
+        <option value="dist" selected>Trier : distance</option>
+        <option value="name">Trier : nom</option>
+      </select>
+    </div>
+
+    <div class="row-slim">
+      <label style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="openNow" />
+        Uniquement les pros ouverts actuellement
+      </label>
+
+      <label style="display:flex;align-items:center;gap:8px;opacity:.9">
+        <input type="checkbox" id="includeUnknown" disabled />
+        Inclure horaires non renseignés
+      </label>
+
+      <button id="btnExport" class="btn">⬇️ Export CSV</button>
+      <button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button>
+    </div>
+
+    <div class="row">
+      <input id="freeKw" class="text" placeholder="Mot-clé libre (ex. VMC, photovoltaïque, salle de bain…)" />
+      <button id="btnAddKw" class="btn">➕ Ajouter au filtre</button>
+      <button id="btnResetApp" class="btn" title="Purger caches + service worker">🧹 Réinitialiser l’appli</button>
+    </div>
+
+    <div id="cats" class="chips">
+      <div class="chip active" data-key="plombier">Sanitaire</div>
+      <div class="chip active" data-key="chauffagiste">Chauffage</div>
+      <div class="chip active" data-key="climatisation pompe à chaleur">Climatisation / ENR</div>
+    </div>
+
     <div id="results" class="results"></div>
     <div class="legend">
       🟢 = Ouvert &nbsp; | &nbsp; 🔴 = Fermé &nbsp; | &nbsp; ⚪ = Horaires non renseignés
@@ -50,30 +101,134 @@
 <script>
 const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
 
-const els = { /* ... inchangé ... */ };
+const els = {
+  city: document.getElementById('city'),
+  btnGeo: document.getElementById('btnGeo'),
+  btnSearch: document.getElementById('btnSearch'),
+  btnExport: document.getElementById('btnExport'),
+  btnAddKw: document.getElementById('btnAddKw'),
+  btnResetApp: document.getElementById('btnResetApp'),
+  radius: document.getElementById('radius'),
+  limit: document.getElementById('limit'),
+  sort: document.getElementById('sort'),
+  openNow: document.getElementById('openNow'),
+  includeUnknown: document.getElementById('includeUnknown'),
+  freeKw: document.getElementById('freeKw'),
+  cats: document.getElementById('cats'),
+  results: document.getElementById('results'),
+};
+
 let state = {lat:null, lon:null, city:null, results:[]};
 
 // ---------- Helpers ----------
-function setSearching(on){ /* ... inchangé ... */ }
-function toast(msg){ /* ... inchangé ... */ }
-function distKm(a,b,c,d){ /* ... inchangé ... */ }
-function savePrefs(){ /* ... inchangé ... */ }
-function loadPrefs(){ /* ... inchangé ... */ }
-['change','click'].forEach(ev=>{ /* ... inchangé ... */ });
+function setSearching(on){
+  els.btnSearch.disabled = on;
+  els.btnSearch.innerHTML = on ? '<span class="spinner"></span>Recherche en cours…' : '🔎 Trouver des prospects';
+}
+function toast(msg){ els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>`; }
+function distKm(a,b,c,d){
+  const R = 6371, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(c - a), dLon = toRad(d - b);
+  const x = Math.sin(dLat/2)**2 + Math.cos(toRad(a)) * Math.cos(toRad(c)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function savePrefs(){
+  const data = {
+    radius: els.radius.value,
+    limit: els.limit.value,
+    sort: els.sort.value,
+    open: els.openNow.checked,
+    includeUnknown: els.includeUnknown.checked
+  };
+  localStorage.setItem('prefs_v1', JSON.stringify(data));
+}
+function loadPrefs(){
+  try{
+    const j = JSON.parse(localStorage.getItem('prefs_v1')||'{}');
+    if(j.radius) els.radius.value = j.radius;
+    if(j.limit) els.limit.value = j.limit;
+    if(j.sort) els.sort.value = j.sort;
+    if(typeof j.open === 'boolean') els.openNow.checked = j.open;
+    if(typeof j.includeUnknown === 'boolean') els.includeUnknown.checked = j.includeUnknown;
+    els.includeUnknown.disabled = !els.openNow.checked;
+  }catch{}
+}
+['change','click'].forEach(ev=>{
+  els.radius.addEventListener(ev, savePrefs);
+  els.limit.addEventListener(ev, savePrefs);
+  els.sort.addEventListener(ev, savePrefs);
+  els.openNow.addEventListener(ev, ()=>{
+    els.includeUnknown.disabled = !els.openNow.checked;
+    if(!els.openNow.checked){ els.includeUnknown.checked = false; }
+    savePrefs();
+  });
+  els.includeUnknown.addEventListener(ev, savePrefs);
+});
 
-// ---------- Chips / Ajout mot-clé / Géoloc / Recherche ... inchangés ----------
+// ---------- Chips ----------
+els.cats.addEventListener('click', e=>{
+  const c=e.target.closest('.chip'); if(!c) return;
+  c.classList.toggle('active');
+});
 
-// ---------- Maps Patch ----------
+// ---------- Ajouter mot-clé libre ----------
+els.btnAddKw.addEventListener('click', ()=>{
+  const val = (els.freeKw.value||'').trim();
+  if(!val) return;
+  const chip = document.createElement('div');
+  chip.className = 'chip active';
+  chip.dataset.key = val;
+  chip.textContent = val;
+  els.cats.appendChild(chip);
+  els.freeKw.value = '';
+});
+
+// ---------- Géolocalisation ----------
+els.btnGeo.addEventListener('click', async ()=>{
+  if(!('geolocation' in navigator)){
+    toast("Géoloc indisponible sur ce navigateur.");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+    try{
+      const r = await fetch(`${WORKER_URL}/geocode?lat=${state.lat}&lon=${state.lon}`);
+      const j = await r.json();
+      state.city = j.results?.[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name
+                || j.results?.[0]?.formatted_address
+                || "—";
+      els.city.textContent = state.city;
+      toast("Position enregistrée ✅");
+    }catch{
+      els.city.textContent = "—";
+      toast("Position enregistrée ✅ (reverse geocode indisponible)");
+    }
+  }, err=>{
+    toast("Impossible d'obtenir la position (permission refusée ?)");
+  }, {enableHighAccuracy:true, timeout:12000, maximumAge:0});
+});
+
+// ---------- Maps (fiable PC + Android PWA) ----------
 function isAndroid(){ return /Android/i.test(navigator.userAgent); }
 function isStandalone(){
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
          || window.navigator.standalone === true;
 }
+function openMapsPayload(btn){
+  const payload = {
+    name: btn.dataset.name || '',
+    addr: btn.dataset.addr || '',
+    lat:  btn.dataset.lat  ? Number(btn.dataset.lat)  : null,
+    lon:  btn.dataset.lon  ? Number(btn.dataset.lon)  : null,
+    place_id: btn.dataset.place || ''
+  };
+  openMaps(payload);
+}
 function openMaps({name, addr, lat, lon, place_id}){
   const label = name || addr || '';
   if(isAndroid() && isStandalone() && lat && lon){
     const geo = `geo:${lat},${lon}?q=${encodeURIComponent(label)}@${lat},${lon}`;
-    window.location.href = geo;
+    window.location.href = geo; // lance l’app Maps
     return;
   }
   let url = '';
@@ -87,27 +242,170 @@ function openMaps({name, addr, lat, lon, place_id}){
   window.open(url,'_blank','noopener,noreferrer');
 }
 
-// ---------- Résultats (modifié seulement le bouton Maps) ----------
+// ---------- Recherche ----------
 els.btnSearch.addEventListener('click', async()=>{
-  // ... ton code de recherche identique ...
-  els.results.innerHTML = rows.map((p,i)=>`
-    <div class="item">
-      <div><strong>${p.name}</strong></div>
-      <div class="meta">
-        <span>${p.status==="open"?"🟢 Ouvert":p.status==="closed"?"🔴 Fermé":"⚪ Horaires non renseignés"}</span>
-        <span class="badge">${p.kw} · ${p.dist.toFixed(1)} km</span>
-        <span class="badge">${p.addr}</span>
+  if(!(state.lat&&state.lon)){ toast("Clique d’abord sur Me géolocaliser."); return; }
+
+  const radius = parseInt(els.radius.value,10);
+  const limit  = parseInt(els.limit.value,10);
+  const sort   = els.sort.value;
+  const openNow = els.openNow.checked;
+  const includeUnknown = els.includeUnknown.checked;
+
+  const kws = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
+  if(kws.length===0){ toast("Sélectionne au moins une catégorie."); return; }
+
+  setSearching(true);
+  try{
+    let all = [];
+    for(const kw of kws){
+      const params = new URLSearchParams({
+        lat: String(state.lat),
+        lon: String(state.lon),
+        radius: String(radius),
+        keyword: kw
+      });
+      if(openNow) params.set('opennow','1');
+
+      const r = await fetch(`${WORKER_URL}/nearby?${params.toString()}`);
+      const j = await r.json();
+
+      for(const p of (j.results||[])){
+        const lat=p.geometry?.location?.lat, lon=p.geometry?.location?.lng;
+        const status = p.opening_hours ? (p.opening_hours.open_now ? "open" : "closed") : "unknown";
+        all.push({
+          place_id:p.place_id,
+          name:p.name,
+          addr:p.vicinity||p.formatted_address||"",
+          lat, lon, kw,
+          dist: distKm(state.lat,state.lon,lat,lon),
+          status
+        });
+      }
+    }
+
+    if(openNow){
+      all = all.filter(r => r.status === 'open' || (includeUnknown && r.status === 'unknown'));
+    }
+
+    const map = new Map();
+    for(const row of all){
+      const prev = map.get(row.place_id);
+      if(!prev){
+        map.set(row.place_id, {...row, cats:new Set([row.kw])});
+      }else{
+        prev.cats.add(row.kw);
+        if((row.addr||'').length > (prev.addr||'').length){ prev.addr = row.addr; }
+        if(row.status === 'open' || prev.status === 'open'){ prev.status = 'open'; }
+      }
+    }
+
+    let rows = [...map.values()].map(r=>({ ...r, kw: [...r.cats].join(' · ')}));
+    rows.sort((a,b)=> (sort==="name" ? a.name.localeCompare(b.name) : a.dist-b.dist));
+    rows = rows.slice(0, limit);
+    state.results = rows;
+
+    if(!rows.length){ toast("Aucun résultat trouvé."); return; }
+
+    els.results.innerHTML = rows.map((p,i)=>`
+      <div class="item" data-name="${p.name}" data-addr="${p.addr}" data-cats="${p.kw}" data-dist="${p.dist.toFixed(2)}">
+        <div><strong>${p.name}</strong></div>
+        <div class="meta">
+          <span>${p.status==="open"?"🟢 Ouvert":p.status==="closed"?"🔴 Fermé":"⚪ Horaires non renseignés"}</span>
+          <span class="badge">${p.kw} · ${p.dist.toFixed(1)} km</span>
+          <span class="badge">${p.addr}</span>
+        </div>
+        <div class="row-slim">
+          <button class="btn btn-maps"
+            data-name="${p.name.replace(/"/g,'&quot;')}"
+            data-addr="${(p.addr||'').replace(/"/g,'&quot;')}"
+            data-lat="${p.lat ?? ''}"
+            data-lon="${p.lon ?? ''}"
+            data-place="${p.place_id ?? ''}">
+            ➡️ Maps
+          </button>
+          <button class="btn" onclick="showDetails('${p.place_id}','det-${i}')">📞 Coordonnées</button>
+        </div>
+        <div class="badge" id="det-${i}" style="margin-top:6px;display:none"></div>
       </div>
-      <div class="row-slim">
-        <button class="btn" onclick='openMaps(${JSON.stringify(p)})'>➡️ Maps</button>
-        <button class="btn" onclick="showDetails('${p.place_id}','det-${i}')">📞 Coordonnées</button>
-      </div>
-      <div class="badge" id="det-${i}" style="margin-top:6px;display:none"></div>
-    </div>
-  `).join("");
+    `).join("");
+
+    // Attache les listeners Maps après rendu
+    document.querySelectorAll('.btn-maps').forEach(btn=>{
+      btn.addEventListener('click', ()=> openMapsPayload(btn));
+    });
+
+  }catch(e){
+    console.warn(e);
+    toast("Erreur (proxy/Google).");
+  }finally{
+    setSearching(false);
+  }
 });
 
-// ---------- Détails / Export / Reset / SW registration ... inchangés ----------
+// ---------- Détails ----------
+async function showDetails(placeId,detId){
+  const el=document.getElementById(detId);
+  if(el.style.display==="block"){ el.style.display="none"; return; }
+  el.style.display="block"; el.textContent="Chargement…";
+  try{
+    const r=await fetch(`${WORKER_URL}/details?place_id=${encodeURIComponent(placeId)}`);
+    const j=await r.json();
+    const d=j.result||{};
+    const tel=d.formatted_phone_number||d.international_phone_number||"—";
+    const web=d.website?`<a target="_blank" href="${d.website}">${d.website}</a>`:"—";
+    const telLink = tel && tel!=="—" ? `<a href="tel:${tel.replaceAll(' ','')}">${tel}</a>` : "—";
+    el.innerHTML=`☎️ ${telLink} &nbsp; • &nbsp; 🌐 ${web}`;
+  }catch{
+    el.textContent="Impossible de récupérer les coordonnées.";
+  }
+}
+
+// ---------- Export CSV ----------
+els.btnExport.addEventListener('click', ()=>{
+  const rows = state.results||[];
+  if(!rows.length){ toast("Rien à exporter (lance une recherche)."); return; }
+  const header = "Nom;Adresse;Catégories;Distance (km);Latitude;Longitude;PlaceID\n";
+  const body = rows.map(r=>[
+    r.name.replace(/;/g,","), (r.addr||"").replace(/;/g,","), r.kw,
+    r.dist.toFixed(2), r.lat, r.lon, r.place_id
+  ].join(";")).join("\n");
+  const blob = new Blob([header+body], {type:"text/csv;charset=utf-8"});
+  const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: "prospects.csv"});
+  a.click(); URL.revokeObjectURL(a.href);
+});
+
+// ---------- Réinitialiser l’appli (cache + service worker)
+els.btnResetApp.addEventListener('click', async ()=>{
+  if(!confirm("Purger le cache, les données et le service worker ?")) return;
+  try{
+    if('caches' in window){
+      const names = await caches.keys();
+      await Promise.all(names.map(n => caches.delete(n)));
+    }
+    if('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    localStorage.clear(); sessionStorage.clear();
+    alert("OK. Recharge l’app.");
+    location.reload();
+  }catch(e){
+    alert("Impossible de purger : " + e.message);
+  }
+});
+
+// Charger préférences au démarrage
+loadPrefs();
+
+// ---------- Enregistrer le service worker (PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => console.log('SW registered'))
+      .catch(e => console.log('SW register failed', e));
+  });
+}
 </script>
 </body>
 </html>
