@@ -5,357 +5,146 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Prospects proches</title>
 <style>
-  :root{--bg:#0f141b;--card:#152033;--muted:#9db2ce;--text:#eaf2ff;--accent:#6558ff;--accent-2:#7a6dff;--chip:#1c2a43;}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial}
+  body{margin:0;background:#0f141b;color:#eaf2ff;font:16px/1.4 system-ui}
   .wrap{max-width:840px;margin:32px auto;padding:0 16px}
   .title{font-weight:700;font-size:22px;margin:0 0 6px}
-  .city{color:var(--muted);margin:0 0 18px}
-  .card{background:var(--card);border-radius:16px;padding:14px 14px 18px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .city{color:#9db2ce;margin:0 0 18px}
+  .card{background:#152033;border-radius:16px;padding:14px 14px 18px;box-shadow:0 6px 20px rgba(0,0,0,.25)}
   .row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
   .btn{background:#1b2844;color:#eaf2ff;border:1px solid #223456;border-radius:12px;padding:12px 14px;cursor:pointer;width:100%;text-align:center}
-  .btn:disabled{opacity:.7;cursor:not-allowed}
-  .btn:active{transform:translateY(1px)}
-  .btn-primary{background:var(--accent);border-color:var(--accent-2);font-weight:600}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  select{width:100%;padding:10px 12px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:#eaf2ff}
+  .btn-primary{background:#6558ff;border-color:#7a6dff;font-weight:600}
+  select{width:100%;padding:10px;border-radius:12px;border:1px solid #24344f;background:#10203a;color:#eaf2ff}
   .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
-  .chip{background:var(--chip);border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:8px 12px;cursor:pointer;user-select:none}
-  .chip.active{background:var(--accent);border-color:var(--accent-2);color:#fff}
-  .hint{color:var(--muted);font-size:13px;margin-top:-2px}
+  .chip{background:#1c2a43;border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:8px 12px;cursor:pointer}
+  .chip.active{background:#6558ff;border-color:#7a6dff;color:#fff}
   .results{margin-top:14px}
-  .item{background:#0f192d;border:1px solid #203050;border-radius:12px;padding:10px 12px;margin-top:10px}
+  .item{background:#0f192d;border:1px solid #203050;border-radius:12px;padding:10px;margin-top:10px}
   .item a{color:#cfe1ff;text-decoration:none}
   .badge{font-size:12px;opacity:.8}
-  .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;
-    border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
+  .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
   @keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1 class="title">Prospects proches</h1>
-    <div class="city">Ville : <span id="city">—</span></div>
-
-    <div class="card">
-      <div class="row">
-        <button id="btnGeo" class="btn">📍 Me géolocaliser</button>
-      </div>
-      <div class="row">
-        <button id="btnReset" class="btn">♻️ Réinitialiser le cache</button>
-      </div>
-
-      <div class="grid">
-        <label>
-          <div>Rayon</div>
-          <select id="radius">
-            <option value="5000">5 km</option>
-            <option value="10000" selected>10 km</option>
-            <option value="15000">15 km</option>
-            <option value="20000">20 km</option>
-          </select>
-        </label>
-        <label>
-          <div>Nombre max</div>
-          <select id="limit">
-            <option value="3">3</option>
-            <option value="5" selected>5</option>
-            <option value="10">10</option>
-          </select>
-        </label>
-      </div>
-
-      <div style="margin-top:8px">Catégories</div>
-      <div id="cats" class="chips">
-        <div class="chip active" data-key="enr">ENR</div>
-        <div class="chip active" data-key="dep">Dépannage chauffage</div>
-        <div class="chip active" data-key="pose">Chauffagiste (pose)</div>
-        <div class="chip active" data-key="san">Sanitaire</div>
-      </div>
-      <div class="hint">Touchez pour (dé)sélectionner une ou plusieurs catégories.</div>
-
-      <div class="row" style="margin-top:12px">
-        <button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button>
-      </div>
-
-      <div id="results" class="results"></div>
+<div class="wrap">
+  <h1 class="title">Prospects proches</h1>
+  <div class="city">Ville : <span id="city">—</span></div>
+  <div class="card">
+    <div class="row"><button id="btnGeo" class="btn">📍 Me géolocaliser</button></div>
+    <div class="row">
+      <select id="radius">
+        <option value="5000">5 km</option>
+        <option value="10000" selected>10 km</option>
+        <option value="20000">20 km</option>
+      </select>
+      <select id="limit">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="10">10</option>
+      </select>
     </div>
+    <div id="cats" class="chips">
+      <div class="chip active" data-key="plumber">Sanitaire</div>
+      <div class="chip active" data-key="heating">Chauffage</div>
+      <div class="chip active" data-key="clim">Climatisation / ENR</div>
+    </div>
+    <div class="row"><button id="btnSearch" class="btn btn-primary">🔎 Trouver des prospects</button></div>
+    <div id="results" class="results"></div>
   </div>
+</div>
 
 <script>
 const els = {
   city: document.getElementById('city'),
   btnGeo: document.getElementById('btnGeo'),
-  btnReset: document.getElementById('btnReset'),
   btnSearch: document.getElementById('btnSearch'),
   radius: document.getElementById('radius'),
   limit: document.getElementById('limit'),
   cats: document.getElementById('cats'),
   results: document.getElementById('results'),
 };
+let state = {lat:null, lon:null, city:null};
 
-let state = { lat: null, lon: null, city: null };
-const LS_KEY = 'prospects_app_state_v3';
+function setSearching(on){
+  els.btnSearch.disabled = on;
+  els.btnSearch.innerHTML = on ? '<span class="spinner"></span>Recherche en cours…' : '🔎 Trouver des prospects';
+}
+function toast(msg){ els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>`; }
 
-function saveState(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
-function loadState(){
-  try{
-    const s = JSON.parse(localStorage.getItem(LS_KEY)||'{}');
-    state = {...state, ...s};
-    if(state.city) els.city.textContent = state.city;
-  }catch{}
-}
-function resetState(){
-  localStorage.removeItem(LS_KEY);
-  state = {lat:null, lon:null, city:null};
-  els.city.textContent = '—';
-  els.results.innerHTML = '';
-}
-async function reverseGeocode(lat, lon){
-  try{
-    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&accept-language=fr`);
-    const data = await res.json();
-    return data.address?.city || data.address?.town || data.address?.village || data.address?.municipality || '—';
-  }catch{ return '—'; }
-}
-function toast(msg){
-  els.results.innerHTML = `<div class="item"><strong>${msg}</strong></div>` + els.results.innerHTML;
-}
 function distKm(a,b,c,d){
-  const R=6371, toRad=x=>x*Math.PI/180;
+  const R=6371,toRad=x=>x*Math.PI/180;
   const dLat=toRad(c-a), dLon=toRad(d-b);
-  const x= Math.sin(dLat/2)**2 + Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;
+  const x=Math.sin(dLat/2)**2+Math.cos(toRad(a))*Math.cos(toRad(c))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(x));
 }
 
-/* catégories -> regex & mots-clés */
-const categoryRegex = {
-  enr: "(clim|climat|pompe\\s*a\\s*chaleur|\\bPAC\\b|photovolta|pv|solair|énergie|energie)",
-  dep: "(d[ée]pann|sav|urgence|chaudi|chauffag|gaz|fioul)",
-  pose:"(install|pose|chauffag|chaudi|pac|clim)",
-  san: "(plomb|sanit|salle\\s*de\\s*bain|robinet|canalis|wc|toilet)"
-};
-
-/* --------- OVERPASS --------- */
-function buildOverpassQuery(lat, lon, radius, activeCats){
-  const re = activeCats.map(k => categoryRegex[k]).join('|');
-  return `
-  [out:json][timeout:25];
-  (
-    node(around:${radius},${lat},${lon})[name~"${re}",i];
-    way(around:${radius},${lat},${lon})[name~"${re}",i];
-    relation(around:${radius},${lat},${lon})[name~"${re}",i];
-
-    node(around:${radius},${lat},${lon})[brand~"${re}",i];
-    node(around:${radius},${lat},${lon})[operator~"${re}",i];
-    node(around:${radius},${lat},${lon})[description~"${re}",i];
-    way(around:${radius},${lat},${lon})[brand~"${re}",i];
-    way(around:${radius},${lat},${lon})[operator~"${re}",i];
-    way(around:${radius},${lat},${lon})[description~"${re}",i];
-
-    node(around:${radius},${lat},${lon})[craft=plumber];
-    way(around:${radius},${lat},${lon})[craft=plumber];
-    node(around:${radius},${lat},${lon})[craft=hvac];
-    way(around:${radius},${lat},${lon})[craft=hvac];
-    node(around:${radius},${lat},${lon})[shop=bathroom];
-    way(around:${radius},${lat},${lon})[shop=bathroom];
-    node(around:${radius},${lat},${lon})[shop=hvac];
-    way(around:${radius},${lat},${lon})[shop=hvac];
-
-    node(around:${radius},${lat},${lon})["air_conditioning"~"yes|true",i];
-    node(around:${radius},${lat},${lon})["heating"~"yes|true",i];
-    node(around:${radius},${lat},${lon})["plumbing"~"yes|true",i];
-  );
-  out center tags;`;
+// reverse geocode via Google
+async function reverseGeocode(lat, lon){
+  const url=`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=YOUR_GOOGLE_API_KEY&language=fr`;
+  const r=await fetch(url);const j=await r.json();
+  return j.results[0]?.address_components?.find(c=>c.types.includes("locality"))?.long_name||"—";
 }
 
-const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.openstreetmap.fr/api/interpreter',
-  'https://overpass.openstreetmap.ru/api/interpreter'
-];
-
-async function tryOverpass(query){
-  for(const url of OVERPASS_ENDPOINTS){
-    try{
-      const r = await fetch(url, {method:'POST', body:query, headers:{'Content-Type':'text/plain; charset=UTF-8'}});
-      if(!r.ok) continue;
-      const data = await r.json();
-      if(data && data.elements && data.elements.length) return data;
-    }catch(e){ /* on tente le miroir suivant */ }
-  }
-  return {elements:[]};
-}
-
-/* --------- PHOTON (Komoot) fallback --------- */
-const photonTerms = {
-  enr: ["climatisation","pompe à chaleur","photovoltaïque","énergie","PAC","clim"],
-  dep: ["dépannage chaudière","SAV chauffage","urgence chauffage"],
-  pose:["chauffagiste","installation chaudière","pose PAC","installateur clim"],
-  san: ["plombier","sanitaire","salle de bain"]
-};
-
-async function photonSearch(lat, lon, radius, activeCats){
-  // Plusieurs requêtes ciblées, puis filtrage par distance
-  const uniq = new Map();
-  for(const k of activeCats){
-    for(const term of photonTerms[k]){
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(term)}&lat=${lat}&lon=${lon}&limit=30&lang=fr`;
-      try{
-        const r = await fetch(url);
-        const j = await r.json();
-        for(const f of (j.features||[])){
-          const [lonF, latF] = f.geometry.coordinates;
-          const name = f.properties.name || f.properties.street || f.properties.city || term;
-          const d = distKm(lat, lon, latF, lonF);
-          if(d*1000 <= radius){ // garde seulement dans le rayon
-            const key = name+'@'+latF.toFixed(5)+','+lonF.toFixed(5);
-            if(!uniq.has(key)){
-              const label =
-                /plomb|sanit/i.test(name) ? 'Sanitaire' :
-                /d[ée]pann|sav|urgence/i.test(name) ? 'Dépannage' :
-                /chauffag|chaudi|install|pose/i.test(name) ? 'Chauffagiste (pose)' : 'ENR';
-              uniq.set(key, {
-                name,
-                lat: latF, lon: lonF,
-                addr: [f.properties.housenumber,f.properties.street,f.properties.city].filter(Boolean).join(' '),
-                categoryLabel: label,
-                dist: d
-              });
-            }
-          }
-        }
-      }catch(e){ /* on continue */ }
-    }
-  }
-  return [...uniq.values()].sort((a,b)=>a.dist-b.dist);
-}
-
-/* Rendu */
-function renderList(list){
-  if(!list.length){
-    els.results.innerHTML = `<div class="item">Aucun résultat dans ce périmètre avec ces catégories.</div>`;
-    return;
-  }
-  els.results.innerHTML = list.map(p=>{
-    const gmaps = `https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}`;
-    return `
-      <div class="item">
-        <div><strong>${p.name || 'Prospect sans nom'}</strong></div>
-        <div class="badge">${p.categoryLabel} · ${p.dist.toFixed(1)} km</div>
-        ${p.addr ? `<div class="badge">${p.addr}</div>`:''}
-        <div style="margin-top:6px"><a href="${gmaps}" target="_blank" rel="noopener">➡️ Ouvrir dans Google Maps</a></div>
-      </div>`;
-  }).join('');
-}
-
-function setSearching(on){
-  if(on){
-    els.btnSearch.disabled = true;
-    els.btnSearch.innerHTML = '<span class="spinner"></span>Recherche en cours…';
-  }else{
-    els.btnSearch.disabled = false;
-    els.btnSearch.innerHTML = '🔎 Trouver des prospects';
-  }
-}
-
-/* EVENTS */
-els.cats.addEventListener('click',(e)=>{
-  const chip = e.target.closest('.chip');
-  if(!chip) return;
-  chip.classList.toggle('active');
+// chips
+els.cats.addEventListener('click', e=>{
+  const c=e.target.closest('.chip');if(!c)return;
+  c.classList.toggle('active');
 });
 
-els.btnReset.addEventListener('click', ()=>{
-  resetState();
-  toast('Cache réinitialisé.');
-});
-
-els.btnGeo.addEventListener('click', async ()=>{
-  if(!('geolocation' in navigator)){ toast("La géolocalisation n'est pas disponible."); return; }
-  els.btnGeo.disabled = true;
-  els.btnGeo.textContent = '📍 Localisation en cours…';
+// géoloc
+els.btnGeo.addEventListener('click',()=>{
   navigator.geolocation.getCurrentPosition(async pos=>{
-    const {latitude, longitude} = pos.coords;
-    state.lat = latitude; state.lon = longitude;
-    state.city = await reverseGeocode(latitude, longitude);
-    els.city.textContent = state.city;
-    saveState();
-    els.btnGeo.textContent = '📍 Me géolocaliser';
-    els.btnGeo.disabled = false;
-    toast('Position enregistrée ✅');
-  }, ()=>{
-    els.btnGeo.textContent = '📍 Me géolocaliser';
-    els.btnGeo.disabled = false;
-    toast("Impossible d'obtenir la position (permission refusée ?).");
-  }, {enableHighAccuracy:true, timeout:15000, maximumAge:30000});
+    state.lat=pos.coords.latitude;state.lon=pos.coords.longitude;
+    state.city=await reverseGeocode(state.lat,state.lon);
+    els.city.textContent=state.city;
+    toast("Position enregistrée ✅");
+  },()=>toast("Impossible d'obtenir la position."));
 });
 
-els.btnSearch.addEventListener('click', async ()=>{
-  const active = [...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
-  if(!active.length){ toast('Sélectionne au moins une catégorie.'); return; }
-  const radius = parseInt(els.radius.value,10);
-  const limit  = parseInt(els.limit.value,10);
-
-  if(!(state.lat && state.lon)){
-    toast('Clique d’abord sur “Me géolocaliser”.');
-    return;
-  }
+// recherche Google Places
+els.btnSearch.addEventListener('click',async()=>{
+  if(!(state.lat&&state.lon)){toast("Clique d’abord sur Me géolocaliser.");return;}
+  const radius=parseInt(els.radius.value,10);
+  const limit=parseInt(els.limit.value,10);
+  const cats=[...document.querySelectorAll('.chip.active')].map(c=>c.dataset.key);
 
   setSearching(true);
   try{
-    // 1) Overpass (multi-miroirs)
-    const query = buildOverpassQuery(state.lat, state.lon, radius, active);
-    const data = await tryOverpass(query);
-
-    const seen = new Set();
-    let prospects = (data.elements||[]).map(el=>{
-      const center = el.center || {lat: el.lat, lon: el.lon};
-      const name = el.tags?.name || el.tags?.brand || 'Prospect';
-      const addr = [el.tags?.addr_housenumber, el.tags?.addr_street, el.tags?.addr_city].filter(Boolean).join(' ');
-      const key = name + '@' + (center.lat?.toFixed(5)||'') + ',' + (center.lon?.toFixed(5)||'');
-      if(seen.has(key)) return null;
-      seen.add(key);
-
-      const line = (name + ' ' + (el.tags?.brand||'') + ' ' + (el.tags?.description||'')).toLowerCase();
-      const label =
-        /plomb|sanit/.test(line) || el.tags?.craft==='plumber' ? 'Sanitaire' :
-        /d[ée]pann|sav|urgence/.test(line) ? 'Dépannage' :
-        /chauffag|chaudi|install|pose/.test(line) ? 'Chauffagiste (pose)' :
-        /clim|pac|photovolta|solair|énergie|energie/.test(line) ? 'ENR' : 'Prospect';
-
-      return {
-        name, lat: center.lat, lon: center.lon, addr,
-        categoryLabel: label,
-        dist: distKm(state.lat, state.lon, center.lat, center.lon)
-      };
-    }).filter(Boolean);
-
-    // 2) Photon fallback si trop peu de résultats
-    if(prospects.length < limit){
-      const photon = await photonSearch(state.lat, state.lon, radius, active);
-      prospects = [...prospects, ...photon].sort((a,b)=>a.dist-b.dist);
-      // dédoublonnage
-      const uniq = new Map();
-      for(const p of prospects){
-        const k = (p.name||'')+'@'+p.lat.toFixed(5)+','+p.lon.toFixed(5);
-        if(!uniq.has(k)) uniq.set(k,p);
+    let results=[];
+    for(const cat of cats){
+      let keyword = "plombier";
+      if(cat==="heating") keyword="chauffagiste";
+      if(cat==="clim") keyword="climatisation pompe à chaleur";
+      const url=`https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${state.lat},${state.lon}&radius=${radius}&keyword=${encodeURIComponent(keyword)}&key=AIzaSyCqX2AhKJ2wGgmegOFa-txu1oiB0Tjpvi4&language=fr`;
+      const r=await fetch(url);const j=await r.json();
+      for(const p of (j.results||[])){
+        const d=distKm(state.lat,state.lon,p.geometry.location.lat,p.geometry.location.lng);
+        results.push({
+          name:p.name,
+          addr:p.vicinity,
+          lat:p.geometry.location.lat,
+          lon:p.geometry.location.lng,
+          categoryLabel:keyword,
+          dist:d
+        });
       }
-      prospects = [...uniq.values()];
     }
+    results=results.sort((a,b)=>a.dist-b.dist);
+    results=results.slice(0,limit);
 
-    renderList(prospects.slice(0, limit));
-    if(!prospects.length) toast("Rien trouvé. Essaie 20 km et toutes les catégories.");
-  }catch(e){
-    toast("Erreur de recherche. Réessaie dans quelques instants.");
-  }finally{
-    setSearching(false);
-  }
+    if(!results.length){toast("Aucun résultat trouvé.");}
+    else{
+      els.results.innerHTML=results.map(p=>`
+        <div class="item">
+          <div><strong>${p.name}</strong></div>
+          <div class="badge">${p.categoryLabel} · ${p.dist.toFixed(1)} km</div>
+          <div class="badge">${p.addr||""}</div>
+          <div style="margin-top:6px"><a target="_blank" href="https://www.google.com/maps?q=${encodeURIComponent(p.name)}@${p.lat},${p.lon}">➡️ Ouvrir dans Google Maps</a></div>
+        </div>`).join("");
+    }
+  }catch(e){toast("Erreur API Google.");}
+  finally{setSearching(false);}
 });
-
-/* init */
-loadState();
 </script>
 </body>
 </html>
