@@ -29,6 +29,9 @@
     .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
     .chip{background:#1c2a43;border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px;user-select:none}
     .chip.active{background:var(--accent);border-color:var(--accent2);color:#fff}
+      /* Auth overlay */
+    .overlay{position:fixed;inset:0;background:rgba(5,10,20,.85);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
+    .panel{background:#0f192d;border:1px solid #203050;border-radius:16px;max-width:420px;width:100%;padding:18px}
   </style>
 </head>
 <body>
@@ -52,7 +55,7 @@
         <option value="10000" selected>10 km</option>
         <option value="20000">20 km</option>
       </select>
-      <input id="keyword" class="text" placeholder="Mot-clé (ex: plombier)" />
+      <input id="keyword" class="text" placeholder="Mot‑clé (ex: plombier)" />
       <label style="display:flex;gap:6px;align-items:center"><input id="onlyOpen" type="checkbox"/> Uniquement ouverts</label>
       <select id="limit" title="Nombre max de résultats">
         <option value="3">3</option>
@@ -79,7 +82,7 @@
 <div id="authOverlay" class="overlay">
   <div class="panel">
     <h3>Connexion requise</h3>
-    <div class="row"><input id="email" class="text" type="email" placeholder="E-mail" autocomplete="username"></div>
+    <div class="row"><input id="email" class="text" type="email" placeholder="E‑mail" autocomplete="username"></div>
     <div class="row"><input id="password" class="text" type="password" placeholder="Mot de passe (≥ 8)" autocomplete="current-password"></div>
     <div class="row">
       <button id="btnLogin" class="btn btn-primary">Se connecter</button>
@@ -110,6 +113,45 @@ async function checkAuth(){
 }
 ui.login.onclick = async()=>{ try{ await api('/auth/login',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Connecté ✔'); await checkAuth(); }catch(e){ toast(e.message==='401'?'Identifiants invalides':'Erreur: '+e.message);} };
 ui.logout.onclick = async()=>{ try{ await api('/auth/logout',{method:'POST'}); }catch(_){ } await checkAuth(); };
+
+// --- GEO auto (restauré)
+ui.btnGeo.onclick = ()=>{
+  if(!state.authed) return setOverlay(true);
+  ui.city.textContent='Localisation…';
+  navigator.geolocation.getCurrentPosition(async(pos)=>{
+    state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+    try{
+      const g=await api(`/geocode?lat=${state.lat}&lon=${state.lon}`);
+      const city=(g?.results?.[0]?.address_components||[])
+        .find(c=>c.types.includes('locality'))?.long_name
+        || g?.results?.[0]?.formatted_address || '—';
+      ui.city.textContent=city;
+    }catch{ ui.city.textContent='—'; }
+  },()=>{
+    ui.city.textContent='—';
+    alert('Géolocalisation refusée ou indisponible. Utilise "Entrer ma position".');
+    ui.btnManual.click();
+  },{enableHighAccuracy:true,timeout:10000});
+};
+
+// --- GEO manuelle (restauré)
+ui.btnManual.onclick = ()=>{
+  ui.lat.style.display=ui.lon.style.display=ui.use.style.display='';
+  ui.lat.focus();
+};
+ui.use.onclick = async ()=>{
+  const lat=parseFloat((ui.lat.value||'').replace(',','.'));
+  const lon=parseFloat((ui.lon.value||'').replace(',','.'));
+  if(Number.isFinite(lat)&&Number.isFinite(lon)){
+    state.lat=lat; state.lon=lon;
+    try{
+      const g=await api(`/geocode?lat=${lat}&lon=${lon}`);
+      ui.city.textContent=g?.results?.[0]?.formatted_address||'—';
+    }catch{ ui.city.textContent='—'; }
+  }else{
+    alert('Coordonnées invalides');
+  }
+};
 
 // ---- Chips ----
 ui.chips.addEventListener('click', (e)=>{
@@ -196,20 +238,7 @@ function showResults(items, badges){
     const badgeOpen=open===true?'🟢 Ouvert':(open===false?'🔴 Fermé':'⚪ Horaires ?');
     const badgeHtml = (badges||[]).map(b=>`<span class=\"badge\">${b}</span>`).join('');
     const mapPayload = JSON.stringify({name,addr,lat:r.geometry?.location?.lat,lon:r.geometry?.location?.lng,place_id:r.place_id});
-    return `<div class=\"item\">
-      <div style=\"display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap\">
-        <div>
-          <div style=\"font-weight:700\">${name} ${badgeHtml}</div>
-          <div class=\"muted\" style=\"margin:4px 0\">${badgeOpen}</div>
-          <div class=\"muted\">📍 ${addr||'—'}</div>
-        </div>
-        <div style=\"display:flex;gap:8px;align-items:center\">
-          <button class=\"btn\" onclick='openMaps(${mapPayload})'>🗺️ Maps</button>
-          <button class=\"btn\" onclick='showDetails(\"${r.place_id}\")'>ℹ️ Infos</button>
-        </div>
-      </div>
-      <div class=\"muted\" id=\"d_${r.place_id}\" style=\"margin-top:6px\"></div>
-    </div>`;
+    return `<div class=\"item\">\n      <div style=\"display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap\">\n        <div>\n          <div style=\"font-weight:700\">${name} ${badgeHtml}</div>\n          <div class=\"muted\" style=\"margin:4px 0\">${badgeOpen}</div>\n          <div class=\"muted\">📍 ${addr||'—'}</div>\n        </div>\n        <div style=\"display:flex;gap:8px;align-items:center\">\n          <button class=\"btn\" onclick='openMaps(${mapPayload})'>🗺️ Maps</button>\n          <button class=\"btn\" onclick='showDetails(\"${r.place_id}\")'>ℹ️ Infos</button>\n        </div>\n      </div>\n      <div class=\"muted\" id=\"d_${r.place_id}\" style=\"margin-top:6px\"></div>\n    </div>`;
   }).join('');
 }
 
