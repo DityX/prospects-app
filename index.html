@@ -135,7 +135,10 @@ ui.logout.onclick = async()=>{ try{ await api('/auth/logout',{method:'POST'}); }
 const CAT_KEYWORDS = {
   enr: ['pompe à chaleur','climatisation','ENR','chauffage réversible'],
   depannage: ['dépannage chaudière','entretien chaudière','réparation chaudière'],
-  sanitaire: ['plombier','sanitaire','salle de bain','dépannage plomberie'],
+  sanitaire: [
+    'plombier','plomberie','artisan plombier',
+    'sanitaire','salle de bain','dépannage plomberie'
+  ],
   chauffagiste: ['chauffagiste','pose chaudière','installation chauffage']
 };
 
@@ -257,6 +260,7 @@ ui.search.onclick = async ()=>{
   ui.res.innerHTML='<span class="spinner"></span> Recherche en cours…';
 
   const activeCats = Array.from(ui.chips.querySelectorAll('.chip.active')).map(c=>c.dataset.cat).filter(c=>c!=='all');
+  const hadManualKeyword = !!(ui.kw && ui.kw.value.trim());
   let keyword = (ui.kw && typeof ui.kw.value==='string') ? ui.kw.value.trim() : '';
   if(activeCats.length){
     const bag = [];
@@ -275,7 +279,7 @@ ui.search.onclick = async ()=>{
 
     const data = await fetch(url,{credentials:'include'}).then(r=>r.json());
     let items = data?.results||[];
-    if(!items.length){ ui.res.textContent='Aucun résultat.'; updateStatus(); return; }
+    if(!items.length){ ui.res.textContent='Aucun résultat.'; return; }
 
     items = items.map(r=>{
       const lat=r.geometry?.location?.lat, lon=r.geometry?.location?.lng;
@@ -328,9 +332,10 @@ ui.search.onclick = async ()=>{
   }catch(e){
     if(String(e).includes('401')) setOverlay(true);
     else ui.res.textContent='Erreur: '+e.message;
+  } finally {
+    if (hadManualKeyword && ui.kw) { ui.kw.value=''; }
+    updateStatus(); savePrefs();
   }
-
-  updateStatus(); savePrefs();
 };
 
 // Maps + Détails (inchangés de fond)
