@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Prospects proches – v1.3.4</title>
+  <title>Prospects proches – v1.3.5</title>
   <style>
     :root{--bg:#0f141b;--panel:#152033;--card:#0f192d;--muted:#9db2ce;--text:#eaf2ff;--accent:#6558ff;--accent2:#7a6dff}
     *{box-sizing:border-box}
@@ -26,15 +26,15 @@
     .badge{display:inline-block;background:#1b2844;border:1px solid #223456;border-radius:999px;padding:2px 8px;font-size:12px;color:#cfe1ff;margin-right:4px}
     .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
     @keyframes spin{to{transform:rotate(360deg)}}
-    /* overlay */
-    .overlay{position:fixed;inset:0;background:rgba(5,10,20,.85);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
-    .panel{background:#0f192d;border:1px solid #203050;border-radius:16px;max-width:420px;width:100%;padding:18px}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+    .chip{background:#1c2a43;border:1px solid #284068;color:#cfe1ff;border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px;user-select:none}
+    .chip.active{background:var(--accent);border-color:var(--accent2);color:#fff}
   </style>
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <h1 class="title">Prospects proches</h1>
+    <h1 class="title">Prospects proches <span style="font-size:14px;color:#9db2ce">v1.3.5</span></h1>
     <div id="authStatus" class="pill">Non connecté</div>
   </div>
   <div class="city">Ville : <span id="city">—</span></div>
@@ -54,6 +54,11 @@
       </select>
       <input id="keyword" class="text" placeholder="Mot-clé (ex: plombier)" />
       <label style="display:flex;gap:6px;align-items:center"><input id="onlyOpen" type="checkbox"/> Uniquement ouverts</label>
+      <select id="limit" title="Nombre max de résultats">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="10">10</option>
+      </select>
       <button id="btnSearch" class="btn btn-primary" style="margin-left:auto">🔎 Chercher</button>
       <button id="btnLogout" class="btn" style="display:none">🚪 Déconnexion</button>
     </div>
@@ -74,11 +79,11 @@
 <div id="authOverlay" class="overlay">
   <div class="panel">
     <h3>Connexion requise</h3>
-    <div class="row"><input id="email" class="text" type="email" placeholder="E‑mail" autocomplete="username"></div>
+    <div class="row"><input id="email" class="text" type="email" placeholder="E-mail" autocomplete="username"></div>
     <div class="row"><input id="password" class="text" type="password" placeholder="Mot de passe (≥ 8)" autocomplete="current-password"></div>
     <div class="row">
       <button id="btnLogin" class="btn btn-primary">Se connecter</button>
-      <button id="btnSignup" class="btn">Créer mon compte</button>
+      <button id="btnSignup" class="btn" style="display:none">Créer mon compte</button>
     </div>
     <div id="authMsg" class="muted"></div>
   </div>
@@ -87,12 +92,7 @@
 <script>
 const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
 const $ = (id)=>document.getElementById(id);
-const ui = {
-  city:$('city'), res:$('results'), btnGeo:$('btnGeoloc'), btnManual:$('btnManual'), lat:$('lat'), lon:$('lon'), use:$('btnUseManual'),
-  radius:$('radius'), kw:$('keyword'), only:$('onlyOpen'), search:$('btnSearch'), logout:$('btnLogout'),
-  chips:$('chips'),
-  overlay:$('authOverlay'), email:$('email'), pass:$('password'), login:$('btnLogin'), signup:$('btnSignup'), msg:$('authMsg'), status:$('authStatus')
-};
+const ui = {city: $('city'), res:$('results'), btnGeo:$('btnGeoloc'), btnManual:$('btnManual'), lat:$('lat'), lon:$('lon'), use:$('btnUseManual'), radius:$('radius'), kw:$('keyword'), only:$('onlyOpen'), limit:$('limit'), search:$('btnSearch'), logout:$('btnLogout'), chips:$('chips'), overlay:$('authOverlay'), email:$('email'), pass:$('password'), login:$('btnLogin'), signup:$('btnSignup'), msg:$('authMsg'), status:$('authStatus')};
 let state = {lat:null, lon:null, authed:false, me:null};
 
 // ---- AUTH ----
@@ -109,31 +109,25 @@ async function checkAuth(){
   catch(_){ state.authed=false; ui.status.textContent='Non connecté'; ui.logout.style.display='none'; setOverlay(true); }
 }
 ui.login.onclick = async()=>{ try{ await api('/auth/login',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Connecté ✔'); await checkAuth(); }catch(e){ toast(e.message==='401'?'Identifiants invalides':'Erreur: '+e.message);} };
-ui.signup.onclick = async()=>{ try{ await api('/auth/signup',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Compte créé, connectez‑vous.'); }catch(e){ toast('Erreur: '+e.message);} };
 ui.logout.onclick = async()=>{ try{ await api('/auth/logout',{method:'POST'}); }catch(_){ } await checkAuth(); };
 
-// ---- GEO ----
-ui.btnGeo.onclick = ()=>{
-  if(!state.authed) return setOverlay(true);
-  ui.city.textContent='Localisation…';
-  navigator.geolocation.getCurrentPosition(async(pos)=>{
-    state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
-    try{ const g=await api(`/geocode?lat=${state.lat}&lon=${state.lon}`); const city = (g?.results?.[0]?.address_components||[]).find(c=>c.types.includes('locality'))?.long_name || g?.results?.[0]?.formatted_address || '—'; ui.city.textContent=city; }
-    catch(e){ ui.city.textContent='—'; }
-  },(err)=>{
-    ui.city.textContent='—'; alert('Géolocalisation refusée ou indisponible. Utilise "Entrer ma position".');
-    ui.btnManual.click();
-  },{enableHighAccuracy:true,timeout:10000});
-};
-ui.btnManual.onclick = ()=>{ ui.lat.style.display=ui.lon.style.display=ui.use.style.display=''; ui.lat.focus(); };
-ui.use.onclick = async()=>{
-  const lat=parseFloat(ui.lat.value.replace(',','.')); const lon=parseFloat(ui.lon.value.replace(',','.'));
-  if(Number.isFinite(lat)&&Number.isFinite(lon)){
-    state.lat=lat; state.lon=lon; try{ const g=await api(`/geocode?lat=${lat}&lon=${lon}`); const city=g?.results?.[0]?.formatted_address||'—'; ui.city.textContent=city; }catch(_){ ui.city.textContent='—'; }
-  } else alert('Coordonnées invalides');
-};
+// ---- Chips ----
+ui.chips.addEventListener('click', (e)=>{
+  const chip = e.target.closest('.chip'); if(!chip) return;
+  const code = chip.dataset.cat;
+  if(code === 'all'){
+    ui.chips.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+  }else{
+    chip.classList.toggle('active');
+    const anyCat = Array.from(ui.chips.querySelectorAll('.chip.active')).some(c=>c.dataset.cat!=='all');
+    const allChip = ui.chips.querySelector('[data-cat="all"]');
+    if(anyCat) allChip.classList.remove('active');
+    if(!anyCat) allChip.classList.add('active');
+  }
+});
 
-// ---- Catégories (priorité 1er terme + fallback) ----
+// ---- Catégories ----
 const CAT_QUERY = {
   sanitaire: ['plombier','plomberie','dépannage plomberie','salle de bain','sanitaire'],
   depannage: ['dépannage chaudière','entretien chaudière','réparation chaudière'],
@@ -148,35 +142,34 @@ ui.search.onclick = async()=>{
   ui.res.innerHTML='<span class="spinner"></span> Recherche en cours…';
 
   const manualKw = (ui.kw.value||'').trim();
+  const limit = parseInt(ui.limit.value||'5',10);
   const activeCats = Array.from(ui.chips.querySelectorAll('.chip.active')).map(c=>c.dataset.cat).filter(c=>c!=='all');
 
   try{
     if(manualKw){
-      const results = await fetchNearby(manualKw);
-      showResults(results,[`Mot-clé: "${manualKw}"`]);
+      const results = (await fetchNearby(manualKw)).slice(0, limit);
+      showResults(results,[`Mot-clé: \"${manualKw}\"`]);
       ui.kw.value='';
       return;
     }
 
-    // Par catégories
     if(!activeCats.length){
-      const results = await fetchNearby('plombier');
+      const results = (await fetchNearby('plombier')).slice(0, limit);
       showResults(results,['Tous']);
       return;
     }
 
     const merged = new Map();
-    // limite souple : 10 max fusionnés
-    const HARD_LIMIT = 10;
     for(const cat of activeCats){
-      const terms = CAT_QUERY[cat]||[];
-      for(const term of terms){
+      for(const term of (CAT_QUERY[cat]||[])){
         const res = await fetchNearby(term);
         for(const r of res){ if(!merged.has(r.place_id)) merged.set(r.place_id,r); }
-        if(merged.size >= HARD_LIMIT) break;
+        if(merged.size >= limit) break;
       }
+      if(merged.size >= limit) break;
     }
-    showResults(Array.from(merged.values()), activeCats.map(code=>{
+    const results = Array.from(merged.values()).slice(0, limit);
+    showResults(results, activeCats.map(code=>{
       return code==='enr'?'ENR': code==='depannage'?'Dépannage chaudière': code==='sanitaire'?'Sanitaire': code==='chauffagiste'?'Chauffagiste': code;
     }));
 
@@ -201,26 +194,26 @@ function showResults(items, badges){
     const addr=r.vicinity||r.formatted_address||'';
     const open=r.opening_hours?.open_now;
     const badgeOpen=open===true?'🟢 Ouvert':(open===false?'🔴 Fermé':'⚪ Horaires ?');
-    const badgeHtml = (badges||[]).map(b=>`<span class="badge">${b}</span>`).join('');
+    const badgeHtml = (badges||[]).map(b=>`<span class=\"badge\">${b}</span>`).join('');
     const mapPayload = JSON.stringify({name,addr,lat:r.geometry?.location?.lat,lon:r.geometry?.location?.lng,place_id:r.place_id});
-    return `<div class="item">
-      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+    return `<div class=\"item\">
+      <div style=\"display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap\">
         <div>
-          <div style="font-weight:700">${name} ${badgeHtml}</div>
-          <div class="muted" style="margin:4px 0">${badgeOpen}</div>
-          <div class="muted">📍 ${addr||'—'}</div>
+          <div style=\"font-weight:700\">${name} ${badgeHtml}</div>
+          <div class=\"muted\" style=\"margin:4px 0\">${badgeOpen}</div>
+          <div class=\"muted\">📍 ${addr||'—'}</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button class="btn" onclick='openMaps(${mapPayload})'>🗺️ Maps</button>
-          <button class="btn" onclick='showDetails("${r.place_id}")'>ℹ️ Infos</button>
+        <div style=\"display:flex;gap:8px;align-items:center\">
+          <button class=\"btn\" onclick='openMaps(${mapPayload})'>🗺️ Maps</button>
+          <button class=\"btn\" onclick='showDetails(\"${r.place_id}\")'>ℹ️ Infos</button>
         </div>
       </div>
-      <div class="muted" id="d_${r.place_id}" style="margin-top:6px"></div>
+      <div class=\"muted\" id=\"d_${r.place_id}\" style=\"margin-top:6px\"></div>
     </div>`;
   }).join('');
 }
 
-// Détails & Maps (inchangés de fond)
+// Maps + détails inchangés
 window.openMaps = ({name,addr,lat,lon,place_id})=>{
   const label=name||addr||''; let url='';
   if(place_id) url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}&query_place_id=${encodeURIComponent(place_id)}`;
@@ -230,7 +223,7 @@ window.openMaps = ({name,addr,lat,lon,place_id})=>{
 };
 window.showDetails = async (place_id)=>{
   const box=document.getElementById('d_'+place_id); if(!box) return; box.textContent='Chargement…';
-  try{ const j=await fetch(WORKER_URL+`/details?place_id=${place_id}`,{credentials:'include'}).then(r=>r.json()); const res=j.result||{}; const tel=res.formatted_phone_number||res.international_phone_number||''; const web=res.website||res.url||''; const telHref=(tel||'').replace(/\s/g,''); box.innerHTML=[tel?`☎️ <a href="tel:${telHref}">${tel}</a>`:'', web?`🌐 <a href="${web}" target="_blank">Site</a>`:''].filter(Boolean).join(' · ') || 'Aucune info.'; }
+  try{ const j=await fetch(WORKER_URL+`/details?place_id=${place_id}`,{credentials:'include'}).then(r=>r.json()); const res=j.result||{}; const tel=res.formatted_phone_number||res.international_phone_number||''; const web=res.website||res.url||''; const telHref=(tel||'').replace(/\s/g,''); box.innerHTML=[tel?`☎️ <a href=\"tel:${telHref}\">${tel}</a>`:'', web?`🌐 <a href=\"${web}\" target=\"_blank\">Site</a>`:''].filter(Boolean).join(' · ') || 'Aucune info.'; }
   catch(_){ box.textContent='Erreur.'; }
 };
 
