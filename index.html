@@ -26,6 +26,9 @@
     .badge{display:inline-block;background:#1b2844;border:1px solid #223456;border-radius:999px;padding:2px 8px;font-size:12px;color:#cfe1ff;margin-right:4px}
     .spinner{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;animation:spin .8s linear infinite;margin-right:8px;vertical-align:-3px}
     @keyframes spin{to{transform:rotate(360deg)}}
+    /* overlay */
+    .overlay{position:fixed;inset:0;background:rgba(5,10,20,.85);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999}
+    .panel{background:#0f192d;border:1px solid #203050;border-radius:16px;max-width:420px;width:100%;padding:18px}
   </style>
 </head>
 <body>
@@ -49,7 +52,7 @@
         <option value="10000" selected>10 km</option>
         <option value="20000">20 km</option>
       </select>
-      <input id="keyword" class="text" placeholder="Mot‑clé (ex: plombier)" />
+      <input id="keyword" class="text" placeholder="Mot-clé (ex: plombier)" />
       <label style="display:flex;gap:6px;align-items:center"><input id="onlyOpen" type="checkbox"/> Uniquement ouverts</label>
       <button id="btnSearch" class="btn btn-primary" style="margin-left:auto">🔎 Chercher</button>
       <button id="btnLogout" class="btn" style="display:none">🚪 Déconnexion</button>
@@ -67,13 +70,70 @@
   </div>
 </div>
 
+<!-- Auth overlay -->
+<div id="authOverlay" class="overlay">
+  <div class="panel">
+    <h3>Connexion requise</h3>
+    <div class="row"><input id="email" class="text" type="email" placeholder="E‑mail" autocomplete="username"></div>
+    <div class="row"><input id="password" class="text" type="password" placeholder="Mot de passe (≥ 8)" autocomplete="current-password"></div>
+    <div class="row">
+      <button id="btnLogin" class="btn btn-primary">Se connecter</button>
+      <button id="btnSignup" class="btn">Créer mon compte</button>
+    </div>
+    <div id="authMsg" class="muted"></div>
+  </div>
+</div>
+
 <script>
 const WORKER_URL = "https://restless-heart-0d76.thiery-dimitri-pro.workers.dev";
 const $ = (id)=>document.getElementById(id);
-const ui = {city: $('city'), res: $('results'), btnGeo: $('btnGeoloc'), btnManual: $('btnManual'), lat:$('lat'), lon:$('lon'), use:$('btnUseManual'), radius:$('radius'), kw:$('keyword'), only:$('onlyOpen'), search:$('btnSearch'), logout:$('btnLogout'), chips:$('chips')};
+const ui = {
+  city:$('city'), res:$('results'), btnGeo:$('btnGeoloc'), btnManual:$('btnManual'), lat:$('lat'), lon:$('lon'), use:$('btnUseManual'),
+  radius:$('radius'), kw:$('keyword'), only:$('onlyOpen'), search:$('btnSearch'), logout:$('btnLogout'),
+  chips:$('chips'),
+  overlay:$('authOverlay'), email:$('email'), pass:$('password'), login:$('btnLogin'), signup:$('btnSignup'), msg:$('authMsg'), status:$('authStatus')
+};
 let state = {lat:null, lon:null, authed:false, me:null};
 
-// Catégories avec mot-clé prioritaire + synonymes
+// ---- AUTH ----
+function setOverlay(v){ ui.overlay.style.display = v?'flex':'none'; }
+function toast(t){ ui.msg.textContent = t; }
+async function api(path, opt={}){
+  const res = await fetch(WORKER_URL+path,{method:opt.method||'GET', headers:{'content-type':'application/json'}, credentials:'include', body: opt.body?JSON.stringify(opt.body):undefined});
+  if(res.status===401) throw new Error('401');
+  const j = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(j.error||res.statusText); return j;
+}
+async function checkAuth(){
+  try{ const me = await api('/auth/me'); state.authed=true; state.me=me; ui.status.textContent='Connecté: '+(me.email||''); ui.logout.style.display=''; setOverlay(false); ui.res.textContent=''; }
+  catch(_){ state.authed=false; ui.status.textContent='Non connecté'; ui.logout.style.display='none'; setOverlay(true); }
+}
+ui.login.onclick = async()=>{ try{ await api('/auth/login',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Connecté ✔'); await checkAuth(); }catch(e){ toast(e.message==='401'?'Identifiants invalides':'Erreur: '+e.message);} };
+ui.signup.onclick = async()=>{ try{ await api('/auth/signup',{method:'POST',body:{email:ui.email.value.trim(),password:ui.pass.value}}); toast('Compte créé, connectez‑vous.'); }catch(e){ toast('Erreur: '+e.message);} };
+ui.logout.onclick = async()=>{ try{ await api('/auth/logout',{method:'POST'}); }catch(_){ } await checkAuth(); };
+
+// ---- GEO ----
+ui.btnGeo.onclick = ()=>{
+  if(!state.authed) return setOverlay(true);
+  ui.city.textContent='Localisation…';
+  navigator.geolocation.getCurrentPosition(async(pos)=>{
+    state.lat=pos.coords.latitude; state.lon=pos.coords.longitude;
+    try{ const g=await api(`/geocode?lat=${state.lat}&lon=${state.lon}`); const city = (g?.results?.[0]?.address_components||[]).find(c=>c.types.includes('locality'))?.long_name || g?.results?.[0]?.formatted_address || '—'; ui.city.textContent=city; }
+    catch(e){ ui.city.textContent='—'; }
+  },(err)=>{
+    ui.city.textContent='—'; alert('Géolocalisation refusée ou indisponible. Utilise "Entrer ma position".');
+    ui.btnManual.click();
+  },{enableHighAccuracy:true,timeout:10000});
+};
+ui.btnManual.onclick = ()=>{ ui.lat.style.display=ui.lon.style.display=ui.use.style.display=''; ui.lat.focus(); };
+ui.use.onclick = async()=>{
+  const lat=parseFloat(ui.lat.value.replace(',','.')); const lon=parseFloat(ui.lon.value.replace(',','.'));
+  if(Number.isFinite(lat)&&Number.isFinite(lon)){
+    state.lat=lat; state.lon=lon; try{ const g=await api(`/geocode?lat=${lat}&lon=${lon}`); const city=g?.results?.[0]?.formatted_address||'—'; ui.city.textContent=city; }catch(_){ ui.city.textContent='—'; }
+  } else alert('Coordonnées invalides');
+};
+
+// ---- Catégories (priorité 1er terme + fallback) ----
 const CAT_QUERY = {
   sanitaire: ['plombier','plomberie','dépannage plomberie','salle de bain','sanitaire'],
   depannage: ['dépannage chaudière','entretien chaudière','réparation chaudière'],
@@ -81,43 +141,46 @@ const CAT_QUERY = {
   enr: ['pompe à chaleur','climatisation','chauffage réversible','ENR']
 };
 
-function setOverlay(v){ document.getElementById('authOverlay').style.display = v?'flex':'none'; }
-
-// Recherche
+// ---- Recherche ----
 ui.search.onclick = async()=>{
   if(!state.authed) return setOverlay(true);
   if(!state.lat||!state.lon) return alert('Définis ta position.');
   ui.res.innerHTML='<span class="spinner"></span> Recherche en cours…';
 
-  const manualKw = ui.kw.value.trim();
+  const manualKw = (ui.kw.value||'').trim();
   const activeCats = Array.from(ui.chips.querySelectorAll('.chip.active')).map(c=>c.dataset.cat).filter(c=>c!=='all');
 
-  let results=[];
-  if(manualKw){
-    // Priorité au mot-clé manuel => ignore les chips
-    results = await fetchNearby(manualKw);
-    showResults(results,[`Mot-clé: "${manualKw}"`]);
-    ui.kw.value='';
-    return;
-  }
-
-  // Sinon, recherche par catégories
-  if(!activeCats.length){
-    results = await fetchNearby('plombier');
-    showResults(results,['Tous']);
-    return;
-  }
-
-  let merged={};
-  for(const cat of activeCats){
-    for(const term of CAT_QUERY[cat]||[]){
-      const res = await fetchNearby(term);
-      res.forEach(r=> merged[r.place_id]=r);
-      if(Object.keys(merged).length >= 10) break;
+  try{
+    if(manualKw){
+      const results = await fetchNearby(manualKw);
+      showResults(results,[`Mot-clé: "${manualKw}"`]);
+      ui.kw.value='';
+      return;
     }
-  }
-  results = Object.values(merged);
-  showResults(results, activeCats);
+
+    // Par catégories
+    if(!activeCats.length){
+      const results = await fetchNearby('plombier');
+      showResults(results,['Tous']);
+      return;
+    }
+
+    const merged = new Map();
+    // limite souple : 10 max fusionnés
+    const HARD_LIMIT = 10;
+    for(const cat of activeCats){
+      const terms = CAT_QUERY[cat]||[];
+      for(const term of terms){
+        const res = await fetchNearby(term);
+        for(const r of res){ if(!merged.has(r.place_id)) merged.set(r.place_id,r); }
+        if(merged.size >= HARD_LIMIT) break;
+      }
+    }
+    showResults(Array.from(merged.values()), activeCats.map(code=>{
+      return code==='enr'?'ENR': code==='depannage'?'Dépannage chaudière': code==='sanitaire'?'Sanitaire': code==='chauffagiste'?'Chauffagiste': code;
+    }));
+
+  }catch(e){ ui.res.textContent = 'Erreur: '+e.message; }
 };
 
 async function fetchNearby(keyword){
@@ -138,10 +201,40 @@ function showResults(items, badges){
     const addr=r.vicinity||r.formatted_address||'';
     const open=r.opening_hours?.open_now;
     const badgeOpen=open===true?'🟢 Ouvert':(open===false?'🔴 Fermé':'⚪ Horaires ?');
-    const badgeHtml = badges.map(b=>`<span class="badge">${b}</span>`).join('');
-    return `<div class="item"><div><strong>${name}</strong> ${badgeHtml}</div><div class="muted">${badgeOpen}</div><div class="muted">📍 ${addr}</div></div>`;
+    const badgeHtml = (badges||[]).map(b=>`<span class="badge">${b}</span>`).join('');
+    const mapPayload = JSON.stringify({name,addr,lat:r.geometry?.location?.lat,lon:r.geometry?.location?.lng,place_id:r.place_id});
+    return `<div class="item">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700">${name} ${badgeHtml}</div>
+          <div class="muted" style="margin:4px 0">${badgeOpen}</div>
+          <div class="muted">📍 ${addr||'—'}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" onclick='openMaps(${mapPayload})'>🗺️ Maps</button>
+          <button class="btn" onclick='showDetails("${r.place_id}")'>ℹ️ Infos</button>
+        </div>
+      </div>
+      <div class="muted" id="d_${r.place_id}" style="margin-top:6px"></div>
+    </div>`;
   }).join('');
 }
+
+// Détails & Maps (inchangés de fond)
+window.openMaps = ({name,addr,lat,lon,place_id})=>{
+  const label=name||addr||''; let url='';
+  if(place_id) url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}&query_place_id=${encodeURIComponent(place_id)}`;
+  else if(lat&&lon) url=`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+  else url=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label)}`;
+  window.open(url,'_blank','noopener');
+};
+window.showDetails = async (place_id)=>{
+  const box=document.getElementById('d_'+place_id); if(!box) return; box.textContent='Chargement…';
+  try{ const j=await fetch(WORKER_URL+`/details?place_id=${place_id}`,{credentials:'include'}).then(r=>r.json()); const res=j.result||{}; const tel=res.formatted_phone_number||res.international_phone_number||''; const web=res.website||res.url||''; const telHref=(tel||'').replace(/\s/g,''); box.innerHTML=[tel?`☎️ <a href="tel:${telHref}">${tel}</a>`:'', web?`🌐 <a href="${web}" target="_blank">Site</a>`:''].filter(Boolean).join(' · ') || 'Aucune info.'; }
+  catch(_){ box.textContent='Erreur.'; }
+};
+
+checkAuth();
 </script>
 </body>
 </html>
